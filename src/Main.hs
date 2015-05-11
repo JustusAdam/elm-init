@@ -4,16 +4,17 @@ module Main (main) where
 
 import           Control.Applicative       (pure, (<*>))
 import qualified Control.Arrow             as Arrow (first)
+import           Control.Exception         (Exception, IOException, catch)
 import           Data.ByteString           as ByteString (ByteString, hPut)
 import           Data.FileEmbed            (embedFile)
-import           Filesystem                (createTree, isDirectory, isFile, getWorkingDirectory)
+import           Data.List                 (intercalate)
+import           Data.Maybe                (fromMaybe)
+import           Filesystem                (createTree, getWorkingDirectory,
+                                            isDirectory, isFile)
 import           Filesystem.Path.CurrentOS as Path
 import           Prelude                   hiding (FilePath)
 import           System.IO                 (IOMode (WriteMode), withFile)
 import qualified Text.JSON                 as JSON
-import Data.List (intercalate)
-import Data.Maybe (fromMaybe)
-import Control.Exception (catch, Exception, IOException)
 
 
 type Result = Either String ()
@@ -62,7 +63,7 @@ askChoices m s l = askChoices' m s l >>= (\i -> return $ l !! i)
 
 getEither :: Read a => a -> IO a
 getEither x = do
-  catch readLn (handler x)
+  Control.Exception.catch readLn (handler x)
   where
     handler :: a -> IOException -> IO a
     handler x = const (return x)
