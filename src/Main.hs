@@ -2,14 +2,15 @@
 
 module Main (main) where
 
-import Prelude hiding (FilePath)
-import Control.Applicative ((<*>), pure)
-import System.IO hiding (FilePath)
-import Filesystem
-import Filesystem.Path.CurrentOS as Path
-import Control.Monad (fmap, liftM)
-import qualified Data.ByteString as ByteString
-import Data.FileEmbed
+import           Control.Applicative       (pure, (<*>))
+import qualified Control.Arrow             as Arrow (first)
+import           Control.Monad             (fmap, liftM)
+import qualified Data.ByteString           as ByteString
+import           Data.FileEmbed
+import           Filesystem
+import           Filesystem.Path.CurrentOS as Path
+import           Prelude                   hiding (FilePath)
+import           System.IO                 hiding (FilePath)
 
 
 data Result = Success | Failiure String
@@ -26,7 +27,7 @@ elmMain = $(embedFile "resources/Main.elm")
 elmPackage :: ByteString.ByteString
 elmPackage = $(embedFile "resources/elm-package.json")
 
-standardFiles = map (\(x, y) -> (decodeString x, y) ) [
+standardFiles = map (Arrow.first decodeString) [
     ("src/Main.elm", Just elmMain),
     ("elm-package.json", Just elmPackage),
     ("README.md", Nothing)
