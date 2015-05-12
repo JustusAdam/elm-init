@@ -1,0 +1,13 @@
+{
+    "version": "1.0.0",
+    "summary": "Initialize a new empty elm project with some basic scaffolding.",
+    "repository": "https://github.com/justusadam/elm-init.git",
+    "license": "MIT",
+    "source-directories": [
+        "src"
+    ],
+    "exposed-modules": [],
+    "dependencies": {
+    },
+    "elm-version": "0.15.0 <= v < 0.16.0"
+}
