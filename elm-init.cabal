@@ -2,9 +2,10 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                elm-init
-version:             0.1.0.0
+version:             0.1.0.1
 synopsis:            Set up basic structure for an elm project
--- description:
+description:
+  Initialize a new empty elm project with some basic scaffolding according to 'https://github.com/evancz/elm-architecture-tutorial'.
 license:             MIT
 license-file:        LICENSE
 author:              justusadam
@@ -14,6 +15,10 @@ category:            Development
 build-type:          Simple
 -- extra-source-files:
 cabal-version:       >=1.10
+extra-source-files:
+  resources/elm-package.json,
+  resources/Main.elm
+
 
 executable elm-init
   main-is:             Main.hs
@@ -29,3 +34,7 @@ executable elm-init
       json >= 0.9
   hs-source-dirs:      src
   default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: git://github.com/JustusAdam/elm-init.git
