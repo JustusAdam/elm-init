@@ -5,6 +5,7 @@ module Main (main) where
 import           Control.Applicative       (pure, (<*>))
 import qualified Control.Arrow             as Arrow (first)
 import           Control.Exception         (Exception, IOException, catch)
+import           Control.Monad             (liftM)
 import           Data.ByteString           as ByteString (ByteString, hPut)
 import           Data.FileEmbed            (embedFile)
 import           Data.List                 (intercalate)
@@ -13,11 +14,50 @@ import           Filesystem                (createTree, getWorkingDirectory,
                                             isDirectory, isFile)
 import           Filesystem.Path.CurrentOS as Path
 import           Prelude                   hiding (FilePath)
+import qualified System.Environment        as Environment (getArgs)
 import           System.IO                 (IOMode (WriteMode), withFile)
 import qualified Text.JSON                 as JSON
+import Data.Bool (bool)
 
 
 type Result = Either String ()
+
+
+data CmdArgs = CmdArgs {
+    workingDirectory :: FilePath
+  }
+
+
+data Version = Version {
+    majorVersion :: Int,
+    minorVersion :: Int,
+    fineVersion  :: Int
+  }
+
+
+data UserDecisions = Default {
+    sourceFolder :: FilePath,
+    version :: Version
+
+  }
+
+
+instance Show Version where
+  showsPrec p (Version ma mi fi) = shows ma . showChar '.' . shows mi . showChar '.' . shows fi
+
+
+instance Read Version where
+  readsPrec p s =
+    -- this is supposed to do read "1.2.3" => Version 1 2 3
+    [(Version ma mi fi, r) |
+      (ma, '.':r2) <- reads s,
+      (mi, '.':r3) <- reads r2,
+      (fi, r) <- reads r3
+      ]
+    -- previous version (also does not work)
+    -- [(Version ma mi fi, r) |
+    --   (ma, '.', mi, '.', fi) <- reads s
+    --   ]
 
 
 standardDirectories = map decodeString [
@@ -48,8 +88,7 @@ standardSourceFiles = map (Arrow.first decodeString) [
 
 
 sourceFolders = [
-    "src",
-    "lala"
+    "src"
   ]
 
 
@@ -62,11 +101,11 @@ askChoices m s l = askChoices' m s l >>= (\i -> return $ l !! i)
 
 
 getEither :: Read a => a -> IO a
-getEither x = do
+getEither x =
   Control.Exception.catch readLn (handler x)
   where
     handler :: a -> IOException -> IO a
-    handler x = const (return x)
+    handler = const . return
 
 
 askChoices' :: String -> Int -> [String] -> IO Int
@@ -79,10 +118,10 @@ askChoices' message selected choices = do
   ask out
 
   where
-    enumF x = ((show x) ++ " )  ")
-    enumFn = (("    " ++).enumF)
-    enumFs = (("  * " ++).enumF)
-    normFormat f l = map ((uncurry (++)).(Arrow.first enumFn)) $ enumerate f l
+    enumF x = show x ++ " )  "
+    enumFn = ("    " ++).enumF
+    enumFs = ("  * " ++).enumF
+    normFormat f l = map (uncurry (++) . Arrow.first enumFn) $ enumerate f l
     selectedFormat x y = ((++ y).enumFs) x
 
     ask out = do
@@ -91,7 +130,7 @@ askChoices' message selected choices = do
           -- omits the last line ... buffering?
           i <- getEither selected
 
-          if i <= (length choices) then
+          if i <= length choices then
             return i
           else do
             putStrLn "invalid choice, please choose again"
@@ -101,7 +140,7 @@ askChoices' message selected choices = do
 askChoicesWithOther :: String -> Int -> [String] -> IO String
 askChoicesWithOther m s l = do
   i <- askChoices' m s (l ++ ["other (specify)"])
-  if i == (length l) then
+  if i == length l then
     getAlternative
   else
     return $ l !! i
@@ -129,15 +168,17 @@ mkFiles = mapM (uncurry mkFile)
 
 
 mkFile :: FilePath -> Maybe ByteString -> IO Result
-mkFile name defaultFile = do
-  e <- exists name
-  if e then
-    return $ Left $ "file " ++ encodeString name ++ " already exists"
-  else do
-    System.IO.withFile (encodeString name) WriteMode $ \h ->
-      maybe (return ()) (ByteString.hPut h) defaultFile
-
-    return $ Right ()
+mkFile name defaultFile = exists name >>=
+  bool
+    (return $ Left $ "file " ++ encodeString name ++ " already exists")
+    (
+      System.IO.withFile
+        (encodeString name)
+        WriteMode
+        (\h -> maybe (return ()) (ByteString.hPut h) defaultFile)
+      >>
+      return (Right ())
+      )
 
 
 mkSourceFiles :: FilePath -> IO [Result]
@@ -148,12 +189,28 @@ mkDirs :: FilePath -> [FilePath] -> IO ()
 mkDirs wd = mapM_ ( createTree . (wd </>))
 
 
+getCmdArgs :: IO CmdArgs
+getCmdArgs =
+  Environment.getArgs >>=
+    (\args ->
+      if length args > 1
+        then
+          return $ decodeString $ head args
+        else
+          getWorkingDirectory
+    ) >>=
+        \wd -> return CmdArgs { workingDirectory = wd }
+
+
+
 main :: IO ()
 main = do
 
-  wd <- getWorkingDirectory
+  wd        <- fmap workingDirectory getCmdArgs
 
   srcFolder <- fmap ((wd </>).decodeString) (askChoicesWithOther "choose a source folder name" 0 sourceFolders)
+
+  projectName <- askChoicesWithOther "project name?" 0 [encodeString wd]
 
   -- putStrLn srcFolder
 
