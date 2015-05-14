@@ -3,21 +3,24 @@
 module Main (main) where
 
 import           Control.Applicative       (pure, (<*>))
-import qualified Control.Arrow             as Arrow (first)
+import qualified Control.Arrow             as Arrow (first, second)
 import           Control.Exception         (Exception, IOException, catch)
-import           Control.Monad             (liftM)
+import           Data.Bool                 (bool)
 import           Data.ByteString           as ByteString (ByteString, hPut)
 import           Data.FileEmbed            (embedFile)
 import           Data.List                 (intercalate)
 import           Data.Maybe                (fromMaybe)
 import           Filesystem                (createTree, getWorkingDirectory,
                                             isDirectory, isFile)
-import           Filesystem.Path.CurrentOS as Path
+import           Filesystem.Path.CurrentOS as Path (FilePath, decodeString,
+                                                    encodeString, (</>))
 import           Prelude                   hiding (FilePath)
 import qualified System.Environment        as Environment (getArgs)
 import           System.IO                 (IOMode (WriteMode), withFile)
-import qualified Text.JSON                 as JSON
-import Data.Bool (bool)
+import           Text.JSON                 as JSON (JSON, JSObject,
+                                                    JSValue (JSArray, JSObject),
+                                                    makeObj, showJSON,
+                                                    toJSObject)
 
 
 type Result = Either String ()
@@ -37,8 +40,10 @@ data Version = Version {
 
 data UserDecisions = Default {
     sourceFolder :: FilePath,
-    version :: Version
-
+    version      :: Version,
+    summary      :: String,
+    repository   :: String,
+    license      :: String
   }
 
 
@@ -50,9 +55,9 @@ instance Read Version where
   readsPrec p s =
     -- this is supposed to do read "1.2.3" => Version 1 2 3
     [(Version ma mi fi, r) |
-      (ma, '.':r2) <- reads s,
-      (mi, '.':r3) <- reads r2,
-      (fi, r) <- reads r3
+      (ma, '#':r2) <- reads s :: [(Int, String)],
+      (mi, '#':r3) <- reads r2 :: [(Int, String)],
+      (fi, r) <- reads r3 :: [(Int, String)]
       ]
     -- previous version (also does not work)
     -- [(Version ma mi fi, r) |
@@ -90,6 +95,40 @@ standardSourceFiles = map (Arrow.first decodeString) [
 sourceFolders = [
     "src"
   ]
+
+
+elmPackageJSON :: UserDecisions -> JSValue
+elmPackageJSON d@(Default {sourceFolder=sourceFolder, version=version, summary=summary, license=license, repository=repository}) =
+  makeObj $ (
+    ("dependencies", JSObject $ toJSObject $ map (Arrow.second showJSON) [
+      ("elm-lang/core", "2.0.0 <= v < 3.0.0"),
+      ("evancz/elm-html", "3.0.0 <= v < 4.0.0")
+      ]
+    )
+  ) : (map (Arrow.second showJSON) [
+    ("version", show version),
+    ("summary", summary),
+    ("repository", repository),
+    ("license", license),
+    ("elm-version", "0.15.0 <= v < 0.16.0")
+  ]) ++ (map (Arrow.second showJSON) [
+    ("source-directories", [
+      showJSON $ encodeString sourceFolder
+      ]),
+    ("exposed-modules", [])
+    ]
+  )
+
+
+emptyDecisions :: UserDecisions
+emptyDecisions =
+  Default {
+    summary       = "",
+    repository    = "https://github.com/JustusAdam/elm-init.git",
+    version       = Version 1 0 0,
+    license       = "BSD3",
+    sourceFolder  = decodeString "src"
+  }
 
 
 enumerate :: Int -> [a] -> [(Int,a)]
