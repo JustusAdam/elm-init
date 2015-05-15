@@ -13,10 +13,8 @@ maintainer:          development@justusadam.com
 -- copyright:
 category:            Development
 build-type:          Simple
--- extra-source-files:
 cabal-version:       >=1.10
 extra-source-files:
-  resources/elm-package.json,
   resources/Main.elm
 
 
