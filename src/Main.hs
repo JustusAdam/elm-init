@@ -11,10 +11,11 @@ import           Data.Aeson               as Aeson (ToJSON, Value, object,
 import           Data.Aeson.Encode.Pretty (encodePretty)
 import           Data.Bool                (bool)
 import qualified Data.ByteString          as ByteString (ByteString, hPut,
-                                                         putStrLn)
+                                                         putStrLn, empty)
 import qualified Data.ByteString.Lazy     as LBS (hPut)
 import           Data.FileEmbed           (embedFile)
 import           Data.List                (intercalate)
+import qualified Data.Map                 as Map (fromList, Map, keys)
 import           Data.Maybe               (fromMaybe)
 import           Data.Text                as Text (Text, append, intercalate,
                                                    pack, splitOn, unpack)
@@ -83,20 +84,6 @@ instance Show Version where
     shows ma . showChar '.' . shows mi . showChar '.' . shows fi
 
 
--- instance Read Version where
---   readsPrec p s =
---     -- this is supposed to do read "1.2.3" => Version 1 2 3
---     [(Version ma mi fi, r) |
---       (ma, '.':r2) <- reads s :: [(Int, String)],
---       (mi, '.':r3) <- reads r2 :: [(Int, String)],
---       (fi, r) <- reads r3 :: [(Int, String)]
---       ]
-    -- previous version (also does not work)
-    -- [(Version ma mi fi, r) |
-    --   (ma, '.', mi, '.', fi) <- reads s
-    --   ]
-
-
 standardDirectories = [
     "elm-stuff"
   ]
@@ -113,20 +100,23 @@ standardSourceFiles = [
   ]
 
 
+standardLicenses = Map.fromList [
+    ("None", ByteString.empty),
+    ("BSD3", $(embedFile "resources/licenses/BSD3")),
+    ("LGPL3", $(embedFile "resources/licenses/LGPL3")),
+    ("LGPL2", $(embedFile "resources/licenses/LGPL2")),
+    ("MIT", $(embedFile "resources/licenses/MIT")),
+    ("Apache", $(embedFile "resources/licenses/Apache"))
+  ] :: Map.Map Text ByteString.ByteString
+
+
 defaultProjectVersion = Version 1 0 0
 
 
 defaultElmVersion = "0.15.0 <= v < 0.16.0"
 
 
-defaultLicenses = [
-    "None",
-    "BSD3",
-    "LGPL3",
-    "LGPL2",
-    "MIT",
-    "Apache"
-  ] :: [Text]
+defaultLicenses = Map.keys standardLicenses
 
 
 {-
@@ -176,7 +166,7 @@ getUserDecisions :: FilePath -> IO UserDecisions
 getUserDecisions wd =
   pure Default
   <*> askChoicesWithOther "project name?" 0 (const True) [pack $ takeBaseName wd]
-  <*> (fmap ((wd </>).unpack) (askChoicesWithOther "choose a source folder name" 0 (const True) (map pack sourceFolders)))
+  <*> fmap ((wd </>).unpack) (askChoicesWithOther "choose a source folder name" 0 (const True) (map pack sourceFolders))
   <*> fmap versionFromString (askChoicesWithOther "initial project version?" 0 (const True) [pack $ show defaultProjectVersion])
   <*> (putStrLn "a quick summary" >> getLine)
   <*> (putStrLn "project repository url" >> getLine)
@@ -204,7 +194,7 @@ versionFromString s
   | length sp /= 3  = error "Parse failed"
   | otherwise       = Version ma mi fi
   where
-    sp@(ma:mi:fi:[]) = map (read.unpack) (splitOn "." s) :: [Int]
+    sp@[ma,mi,fi] = map (read.unpack) (splitOn "." s) :: [Int]
 
 
 
@@ -226,7 +216,7 @@ askChoices' message selected choices = do
   ask out
 
   where
-    (l1, (selectedElem : l2tail)) = splitAt selected choices
+    (l1, selectedElem : l2tail) = splitAt selected choices
     out =
       Text.intercalate
         "\n"
@@ -234,10 +224,10 @@ askChoices' message selected choices = do
         ++ (selectedFormat selected selectedElem : normFormat (selected + 1) l2tail))
 
     enumF x = append (pack $ show x) " )  "
-    enumFn = (append "    ").enumF
-    enumFs = (append "  * ").enumF
-    normFormat f l = map ((uncurry append) . Arrow.first enumFn) $ enumerate f l
-    selectedFormat x y = ((`append` y).enumFs) x
+    enumFn = append "    " . enumF
+    enumFs = append "  * " . enumF
+    normFormat f l = map (uncurry append . Arrow.first enumFn) $ enumerate f l
+    selectedFormat x y = ((`append` y) . enumFs) x
 
     ask out = do
           TextIO.putStrLn out
@@ -301,7 +291,7 @@ mkSourceFiles sourceFolder = mkFiles $ map (Arrow.first (sourceFolder </>)) stan
 
 
 mkDirs :: FilePath -> [FilePath] -> IO ()
-mkDirs wd = mapM_ ((createDirectoryIfMissing True) . (wd </>))
+mkDirs wd = mapM_ (createDirectoryIfMissing True . (wd </>))
 
 
 writeConf :: FilePath -> UserDecisions -> IO ()
