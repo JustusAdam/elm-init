@@ -21,6 +21,8 @@ extra-source-files:
   resources/licenses/LGPL2
   resources/licenses/LGPL3
   resources/licenses/MIT
+  resources/licenses/GPLv3
+  resources/licenses/GPLv2
 
 
 executable elm-init
