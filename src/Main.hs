@@ -336,16 +336,16 @@ verifyWD :: FilePath -> IO FilePath
 verifyWD wd =
   doesFileExist wd >>=
     bool
-      (error "The chosen directory is a file") -- I'm so sorry
       (doesDirectoryExist wd >>=
         bool
-          (return wd)
           (putStrLn "the chosen directory does not exist yet, shall I create it? [y/n]"
           >> getResp >>=
             (bool
-              makeDirs
-              (error "the chosen directory does not exist"))  -- I'm so sorry
-          >> return wd))
+              (error "the chosen directory does not exist")  -- I'm so sorry
+              makeDirs)
+          >> return wd)
+          (return wd))
+      (error "The chosen directory is a file") -- I'm so sorry
 
   where
     getResp :: IO Bool
