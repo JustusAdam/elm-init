@@ -111,16 +111,6 @@ defaultElmVersion = "0.15.0 <= v < 0.16.0"
 defaultLicenses = fst $ unzip standardLicenses
 
 
-{-
-  embedding a file as String
-
-  import Data.Binary
-
-  file :: String
-  file = decode $(embedFile "filepath")
--}
-
-
 sourceFolders =
   [ "src" ]
 
@@ -354,14 +344,14 @@ verifyWD wd =
           >> getResp >>=
             (bool
               makeDirs
-              (error "the chosen directory does not exist"))
+              (error "the chosen directory does not exist"))  -- I'm so sorry
           >> return wd))
 
   where
     getResp :: IO Bool
     getResp = fmap (`elem` ["y", "yes"]) getLine
 
-    makeDirs = createDirectoryIfMissing True wd -- >> return wd
+    makeDirs = createDirectoryIfMissing True wd
 
 
 
