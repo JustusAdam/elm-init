@@ -267,7 +267,7 @@ askChoicesWithOther m s verifier l = do
   where
     getAlternative = do
       putStrLn "please enter an alternative"
-      
+
       s <- getLine
       if verifier s then
         return s
@@ -338,30 +338,30 @@ getCmdArgs =
         case args of
           []  -> getCurrentDirectory
           [x] -> makeAbsolute x
-          _   -> error "Too many arguments"  -- I'm so sorry
-      ))
+          _   -> error "Too many arguments"))  -- I'm so sorry
+
 
 
 verifyWD :: FilePath -> IO FilePath
-verifyWD wd = do
-  isFile  <- doesFileExist wd
-  isDir   <- doesDirectoryExist wd
-
-  if isFile then
-    error "The chosen directory is a file" -- I'm so sorry
-  else if not isDir then do
-    putStrLn "the chosen directory does not exist yet, shall I create it? [y/n]"
-    b <- waitLoop
-    if b then
-      createDirectoryIfMissing True wd >> return wd
-    else
-      error "the chosen directory does not exist"
-  else
-    return wd
+verifyWD wd =
+  doesFileExist wd >>=
+    bool
+      (error "The chosen directory is a file") -- I'm so sorry
+      (doesDirectoryExist wd >>=
+        bool
+          (return wd)
+          (putStrLn "the chosen directory does not exist yet, shall I create it? [y/n]"
+          >> getResp >>=
+            (bool
+              makeDirs
+              (error "the chosen directory does not exist"))
+          >> return wd))
 
   where
-    waitLoop :: IO Bool
-    waitLoop = fmap (`elem` ["y", "yes"]) getLine
+    getResp :: IO Bool
+    getResp = fmap (`elem` ["y", "yes"]) getLine
+
+    makeDirs = createDirectoryIfMissing True wd -- >> return wd
 
 
 
