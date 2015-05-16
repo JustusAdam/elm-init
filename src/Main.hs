@@ -15,7 +15,6 @@ import qualified Data.ByteString          as ByteString (ByteString, hPut,
 import qualified Data.ByteString.Lazy     as LBS (hPut)
 import           Data.FileEmbed           (embedFile)
 import           Data.List                (intercalate)
-import qualified Data.Map                 as Map (fromList, Map, keys)
 import           Data.Maybe               (fromMaybe)
 import           Data.Text                as Text (Text, append, intercalate,
                                                    pack, splitOn, unpack)
@@ -24,10 +23,10 @@ import           Data.Traversable         (sequenceA)
 import           Prelude                  hiding (getLine, putStrLn)
 import           System.Directory         (createDirectoryIfMissing,
                                            doesDirectoryExist, doesFileExist,
-                                           getCurrentDirectory)
+                                           getCurrentDirectory, makeAbsolute)
 import qualified System.Environment       as Environment (getArgs)
 import           System.FilePath          (takeBaseName, (</>))
-import           System.IO                (IOMode (WriteMode), withFile)
+import           System.IO                (IOMode (WriteMode), withFile, fixIO)
 
 
 type Result = Either Text ()
@@ -100,14 +99,16 @@ standardSourceFiles = [
   ]
 
 
-standardLicenses = Map.fromList [
+standardLicenses = [
     ("None", ByteString.empty),
     ("BSD3", $(embedFile "resources/licenses/BSD3")),
     ("LGPL3", $(embedFile "resources/licenses/LGPL3")),
     ("LGPL2", $(embedFile "resources/licenses/LGPL2")),
     ("MIT", $(embedFile "resources/licenses/MIT")),
-    ("Apache", $(embedFile "resources/licenses/Apache"))
-  ] :: Map.Map Text ByteString.ByteString
+    ("Apache", $(embedFile "resources/licenses/Apache")),
+    ("GPLv2", $(embedFile "resources/licenses/GPLv2")),
+    ("GPLv3", $(embedFile "resources/licenses/GPLv3"))
+  ] :: [(Text, ByteString.ByteString)]
 
 
 defaultProjectVersion = Version 1 0 0
@@ -116,7 +117,7 @@ defaultProjectVersion = Version 1 0 0
 defaultElmVersion = "0.15.0 <= v < 0.16.0"
 
 
-defaultLicenses = Map.keys standardLicenses
+defaultLicenses = fst $ unzip standardLicenses
 
 
 {-
@@ -298,13 +299,21 @@ writeConf :: FilePath -> UserDecisions -> IO ()
 writeConf wd dec = withFile (wd </> elmConfigName) System.IO.WriteMode (`LBS.hPut` (encodePretty $ makePackage dec))
 
 
+putLicense :: FilePath -> Text -> IO Result
+putLicense wd license =
+  maybe
+    (return $ Left "License file not found")
+    (fmap Right . (withFile (wd </> "LICENSE") WriteMode . (\d h -> ByteString.hPut h d)))
+    (lookup license standardLicenses)
+
+
 getCmdArgs :: IO CmdArgs
 getCmdArgs =
   Environment.getArgs >>=
     (\args ->
-      if length args > 1
+      if length args > 0
         then
-          return $ head args
+          makeAbsolute $ head args
         else
           getCurrentDirectory
     ) >>=
@@ -320,14 +329,12 @@ main = do
   decisions <- getUserDecisions wd
 
   mkDirs wd (sourceFolder decisions : standardDirectories)
-  resStatic <- mkFiles standardFiles
+  resStatic <- mkFiles $ map (Arrow.first (wd </>)) standardFiles
 
-  resSource <- mkSourceFiles $ sourceFolder decisions
+  resSource <- mkSourceFiles $ wd </> sourceFolder decisions
 
   writeConf wd decisions
 
-  mapM_ (\r ->
-      case r of
-        Right _       -> return ()
-        Left message  -> TextIO.putStrLn message
-    ) (resStatic ++ resSource)
+  putLicense wd (license decisions)
+
+  mapM_ (either TextIO.putStrLn return) (resStatic ++ resSource)
