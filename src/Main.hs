@@ -27,6 +27,26 @@ import           System.FilePath          (isValid, takeBaseName, (</>))
 import           System.IO                (IOMode (WriteMode), withFile)
 
 
+standardDirectories = [ "elm-stuff" ]
+standardSourceFolders = [ "src" ]
+standardFiles = [ ("README.md", Nothing) ]
+standardSourceFiles = [ ("Main.elm", Just $(embedFile "resources/Main.elm")) ]
+standardLicenses =
+  [ ("None", ByteString.empty)
+  , ("BSD3", $(embedFile "resources/licenses/BSD3"))
+  , ("LGPL3", $(embedFile "resources/licenses/LGPL3"))
+  , ("LGPL2", $(embedFile "resources/licenses/LGPL2"))
+  , ("MIT", $(embedFile "resources/licenses/MIT"))
+  , ("Apache", $(embedFile "resources/licenses/Apache"))
+  , ("GPLv2", $(embedFile "resources/licenses/GPLv2"))
+  , ("GPLv3", $(embedFile "resources/licenses/GPLv3"))
+  ] :: [(Text, ByteString.ByteString)]
+defaultProjectVersion = Version 1 0 0
+defaultElmVersion = "0.15.0 <= v < 0.16.0"
+availableLicenses = fst $ unzip standardLicenses
+elmConfigName = "elm-package.json" :: FilePath
+
+
 type Result = Either Text ()
 
 
@@ -76,58 +96,12 @@ instance Show Version where
     shows ma . showChar '.' . shows mi . showChar '.' . shows fi
 
 
-standardDirectories =
-  [ "elm-stuff" ]
-
-
-standardFiles =
-  [ ("README.md", Nothing)
-  , ("LICENSE", Nothing)
-  ]
-
-
-standardSourceFiles =
-  [ ("Main.elm", Just $(embedFile "resources/Main.elm")) ]
-
-
-standardLicenses =
-  [ ("None", ByteString.empty)
-  , ("BSD3", $(embedFile "resources/licenses/BSD3"))
-  , ("LGPL3", $(embedFile "resources/licenses/LGPL3"))
-  , ("LGPL2", $(embedFile "resources/licenses/LGPL2"))
-  , ("MIT", $(embedFile "resources/licenses/MIT"))
-  , ("Apache", $(embedFile "resources/licenses/Apache"))
-  , ("GPLv2", $(embedFile "resources/licenses/GPLv2"))
-  , ("GPLv3", $(embedFile "resources/licenses/GPLv3"))
-  ] :: [(Text, ByteString.ByteString)]
-
-
-defaultProjectVersion = Version 1 0 0
-
-
-defaultElmVersion = "0.15.0 <= v < 0.16.0"
-
-
-defaultLicenses = fst $ unzip standardLicenses
-
-
-sourceFolders =
-  [ "src" ]
-
-
-elmConfigName = "elm-package.json" :: FilePath
-
-
-makePackage :: UserDecisions -> ElmPackage
-makePackage = pure ElmPackage
-  <*> version
-  <*> summary
-  <*> repository
-  <*> license
-  <*> const (object [])
-  <*> const []
-  <*> elmVersion
-
+versionFromString :: Text -> Version
+versionFromString s
+  | length sp /= 3  = error "Parse failed"  -- I'm so sorry
+  | otherwise       = Version ma mi fi
+  where
+    sp@[ma,mi,fi] = map (read.unpack) (splitOn "." s) :: [Int]
 
 
 emptyDecisions :: UserDecisions
@@ -142,76 +116,31 @@ emptyDecisions =
           }
 
 
-getUserDecisions :: FilePath -> IO UserDecisions
-getUserDecisions wd =
-  pure Default
-  <*> askChoicesWithOther
-        "project name?"
-        0
-        (const True)
-        [pack $ takeBaseName wd]
-  <*> fmap
-        ((wd </>) . unpack)
-        (askChoicesWithOther
-          "choose a source folder name"
-          0
-          (isValid . unpack)  -- filepath path verifier
-          (map pack sourceFolders))
-  <*> fmap
-        versionFromString
-        (askChoicesWithOther
-          "initial project version?"
-          0
-          (const True)  -- TODO add verifier
-          [pack $ show defaultProjectVersion])
-  <*> (putStrLn "a quick summary" >> getLine)
-  <*> (putStrLn "project repository url" >> getLine)
-  <*> askChoicesWithOther
-        "choose a license"
-        0
-        (const True)
-        defaultLicenses
-  <*> askChoicesWithOther
-        "select the elm-version"
-        0
-        (const True)  -- add verifier?
-        [defaultElmVersion]
+makePackage :: UserDecisions -> ElmPackage
+makePackage = pure ElmPackage
+  <*> version
+  <*> summary
+  <*> repository
+  <*> license
+  <*> const (object [])
+  <*> const []
+  <*> elmVersion
 
 
 enumerate :: Int -> [a] -> [(Int,a)]
 enumerate from l = zip [from..(length l)] l
 
 
-splitL :: Eq a => a -> [a] -> [[a]]
-splitL _ [] = []
-splitL se l = reverse $ foldl (helper se) [[]] l
-  where
-    helper :: Eq a => a -> [[a]] -> a -> [[a]]
-    helper se [] e = helper se [[]] e
-    helper se acc@(x:xs) e
-      | se == e   = []:acc
-      | otherwise = (e:x):xs
-
-
-versionFromString :: Text -> Version
-versionFromString s
-  | length sp /= 3  = error "Parse failed"  -- I'm so sorry
-  | otherwise       = Version ma mi fi
-  where
-    sp@[ma,mi,fi] = map (read.unpack) (splitOn "." s) :: [Int]
-
-
-
-askChoices :: Text -> Int -> [Text] -> IO Text
-askChoices m s l = askChoices' m s l >>= (\i -> return $ l !! i)
-
-
 getEither :: Read a => a -> IO a
 getEither x =
-  Control.Exception.catch readLn (handler x)
+  catch readLn (handler x)
   where
     handler :: a -> IOException -> IO a
     handler = const . return
+
+
+askChoices :: Text -> Int -> [Text] -> IO Text
+askChoices m s l = fmap (l !!) (askChoices' m s l)
 
 
 askChoices' :: Text -> Int -> [Text] -> IO Int
@@ -230,7 +159,7 @@ askChoices' message selected choices = do
     enumF x = append (pack $ show x) " )  "
     enumFn = append "    " . enumF
     enumFs = append "  * " . enumF
-    normFormat f = map (uncurry append . Arrow.first enumFn) . enumerate f
+    normFormat = curry (map (uncurry append . Arrow.first enumFn) . uncurry enumerate)
     selectedFormat x y = (flip append y . enumFs) x
 
     ask out = do
@@ -267,10 +196,80 @@ askChoicesWithOther m s verifier l = do
 
 
 exists :: FilePath -> IO Bool
-exists f = do
-  isF   <- doesFileExist f
-  isDir <- doesDirectoryExist f
-  return $ isF || isDir
+exists f =
+  doesFileExist f >>=
+  bool
+    (doesDirectoryExist f)
+    (return True)
+
+
+getCmdArgs :: IO CmdArgs
+getCmdArgs =
+  fmap CmdArgs
+    (getArgs >>=
+      (\args ->
+        case args of
+          []  -> getCurrentDirectory
+          [x] -> makeAbsolute x
+          _   -> error "Too many arguments"))  -- I'm so sorry
+
+
+verifyWD :: FilePath -> IO FilePath
+verifyWD wd =
+  doesFileExist wd >>=
+    bool
+      (doesDirectoryExist wd >>=
+        bool
+          (putStrLn "the chosen directory does not exist yet, shall I create it? [y/n]"
+          >> getResp >>=
+            bool
+              (error "the chosen directory does not exist")  -- I'm so sorry
+              makeDirs
+          >> return wd)
+          (return wd))
+      (error "The chosen directory is a file") -- I'm so sorry
+
+  where
+    getResp :: IO Bool
+    getResp = fmap (`elem` ["y", "yes"]) getLine
+
+    makeDirs = createDirectoryIfMissing True wd
+
+
+getUserDecisions :: FilePath -> IO UserDecisions
+getUserDecisions wd =
+  pure Default
+  <*> askChoicesWithOther
+        "project name?"
+        0
+        (const True)
+        [pack $ takeBaseName wd]
+  <*> fmap
+        ((wd </>) . unpack)
+        (askChoicesWithOther
+          "choose a source folder name"
+          0
+          (isValid . unpack)  -- filepath path verifier
+          (map pack standardSourceFolders))
+  <*> fmap
+        versionFromString
+        (askChoicesWithOther
+          "initial project version?"
+          0
+          (const True)  -- TODO add verifier
+          [pack $ show defaultProjectVersion])
+  <*> (putStrLn "a quick summary" >> getLine)
+  <*> (putStrLn "project repository url" >> getLine)
+  <*> askChoicesWithOther
+        "choose a license"
+        0
+        (const True)
+        availableLicenses
+  <*> askChoicesWithOther
+        "select the elm-version"
+        0
+        (const True)  -- add verifier?
+        [defaultElmVersion]
 
 
 mkFiles :: [(FilePath, Maybe ByteString.ByteString)] -> IO [Result]
@@ -282,7 +281,7 @@ mkFile name defaultFile = exists name >>=
   bool
     (withFile
       name
-      System.IO.WriteMode
+      WriteMode
       (\h -> maybe (return ()) (ByteString.hPut h) defaultFile)
     >> return (Right ()))
     (return $ Left $ "file " `append` pack name `append` " already exists")
@@ -318,41 +317,6 @@ putLicense wd =
           WriteMode
       . flip ByteString.hPut)
   . flip lookup standardLicenses
-
-
-getCmdArgs :: IO CmdArgs
-getCmdArgs =
-  fmap CmdArgs
-    (getArgs >>=
-      (\args ->
-        case args of
-          []  -> getCurrentDirectory
-          [x] -> makeAbsolute x
-          _   -> error "Too many arguments"))  -- I'm so sorry
-
-
-
-verifyWD :: FilePath -> IO FilePath
-verifyWD wd =
-  doesFileExist wd >>=
-    bool
-      (doesDirectoryExist wd >>=
-        bool
-          (putStrLn "the chosen directory does not exist yet, shall I create it? [y/n]"
-          >> getResp >>=
-            (bool
-              (error "the chosen directory does not exist")  -- I'm so sorry
-              makeDirs)
-          >> return wd)
-          (return wd))
-      (error "The chosen directory is a file") -- I'm so sorry
-
-  where
-    getResp :: IO Bool
-    getResp = fmap (`elem` ["y", "yes"]) getLine
-
-    makeDirs = createDirectoryIfMissing True wd
-
 
 
 main :: IO ()
