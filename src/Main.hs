@@ -18,6 +18,7 @@ import           Data.Maybe               (fromMaybe)
 import           Data.Text                as Text (Text, append, intercalate,
                                                    pack, splitOn, unpack)
 import           Data.Text.IO             as TextIO (getLine, putStrLn)
+import           Data.Traversable         (sequenceA)
 import           Prelude                  hiding (getLine, putStrLn)
 import           System.Directory         (createDirectoryIfMissing,
                                            doesDirectoryExist, doesFileExist,
@@ -248,7 +249,7 @@ verifyWD wd =
 
   where
     getResp :: IO Bool
-    getResp = fmap (`elem` ["y", "yes"]) getLine
+    getResp = fmap (flip elem ["y", "yes"]) getLine
 
     makeDirs = createDirectoryIfMissing True wd
 
