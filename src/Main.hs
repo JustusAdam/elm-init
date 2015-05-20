@@ -3,7 +3,7 @@
 
 module Main (main) where
 
-import           Control.Applicative      (pure, (<*>))
+
 import qualified Control.Arrow            as Arrow (first)
 import           Control.Exception        (IOException, catch)
 import           Data.Aeson               as Aeson (ToJSON, Value, object,
@@ -11,13 +11,12 @@ import           Data.Aeson               as Aeson (ToJSON, Value, object,
 import           Data.Aeson.Encode.Pretty (encodePretty)
 import           Data.Bool                (bool)
 import qualified Data.ByteString          as ByteString (ByteString, empty,
-                                                         hPut, putStrLn)
+                                                         hPut)
 import qualified Data.ByteString.Lazy     as LBS (hPut)
 import           Data.FileEmbed           (embedFile)
 import           Data.Text                as Text (Text, append, intercalate,
-                                                   pack, splitOn, unpack, toLower)
+                                                   pack, splitOn, unpack)
 import           Data.Text.IO             as TextIO (getLine, putStrLn)
-import           Data.Traversable         (sequenceA)
 import           Prelude                  hiding (getLine, putStrLn)
 import           System.Directory         (createDirectoryIfMissing,
                                            doesDirectoryExist, doesFileExist,
@@ -27,10 +26,19 @@ import           System.FilePath          (isValid, takeBaseName, (</>))
 import           System.IO                (IOMode (WriteMode), withFile)
 
 
+standardDirectories :: [FilePath]
 standardDirectories = [ "elm-stuff" ]
+
+standardSourceFolders :: [FilePath]
 standardSourceFolders = [ "src" ]
+
+standardFiles :: [(FilePath, Maybe ByteString.ByteString)]
 standardFiles = [ ("README.md", Nothing) ]
+
+standardSourceFiles :: [(FilePath, Maybe ByteString.ByteString)]
 standardSourceFiles = [ ("Main.elm", Just $(embedFile "resources/Main.elm")) ]
+
+standardLicenses :: [(Text, ByteString.ByteString)]
 standardLicenses =
   [ ("None", ByteString.empty)
   , ("BSD3", $(embedFile "resources/licenses/BSD3"))
@@ -41,10 +49,18 @@ standardLicenses =
   , ("GPLv2", $(embedFile "resources/licenses/GPLv2"))
   , ("GPLv3", $(embedFile "resources/licenses/GPLv3"))
   ] :: [(Text, ByteString.ByteString)]
+
+defaultProjectVersion :: Version
 defaultProjectVersion = Version 1 0 0
+
+defaultElmVersion :: Text
 defaultElmVersion = "0.15.0 <= v < 0.16.0"
+
+availableLicenses :: [Text]
 availableLicenses = fst $ unzip standardLicenses
-elmConfigName = "elm-package.json" :: FilePath
+
+elmConfigName :: FilePath
+elmConfigName = "elm-package.json"
 
 
 type Result = Either Text ()
@@ -92,7 +108,7 @@ instance Aeson.ToJSON ElmPackage where
 
 
 instance Show Version where
-  showsPrec p (Version ma mi fi) =
+  showsPrec _ (Version ma mi fi) =
     shows ma . showChar '.' . shows mi . showChar '.' . shows fi
 
 
@@ -162,8 +178,8 @@ askChoices' message selected choices = do
     normFormat = curry (map (uncurry append . Arrow.first enumFn) . uncurry enumerate)
     selectedFormat x y = (flip append y . enumFs) x
 
-    ask out = do
-          putStrLn out
+    ask aout = do
+          putStrLn aout
           -- apparently using putStr here doe not print the full string but
           -- omits the last line ... buffering?
           i <- getEither selected
@@ -172,7 +188,7 @@ askChoices' message selected choices = do
             return i
           else do
             putStrLn "invalid choice, please choose again"
-            ask out
+            ask aout
 
 
 askChoicesWithOther :: Text -> Int -> (Text -> Bool) -> [Text] -> IO Text
@@ -187,9 +203,9 @@ askChoicesWithOther m s verifier l = do
     getAlternative = do
       putStrLn "please enter an alternative"
 
-      s <- getLine
-      if verifier s then
-        return s
+      str <- getLine
+      if verifier str then
+        return str
       else
         putStrLn "Invalid input, plese enter again" >>
         getAlternative
@@ -288,9 +304,9 @@ mkFile name defaultFile = exists name >>=
 
 
 mkSourceFiles :: FilePath -> IO [Result]
-mkSourceFiles sourceFolder =
+mkSourceFiles sf =
   mkFiles $ map
-              (Arrow.first (sourceFolder </>))
+              (Arrow.first (sf </>))
               standardSourceFiles
 
 
@@ -341,7 +357,7 @@ main = do
   writeConf wd decisions
 
   -- write the choosen license
-  putLicense wd (license decisions)
+  _         <- putLicense wd (license decisions)
 
   -- report all errors
   mapM_ (either putStrLn return) (resStatic ++ resSource)
