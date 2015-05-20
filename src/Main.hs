@@ -176,7 +176,7 @@ askChoices' message selected choices = do
     enumF x = append (pack $ show x) " )  "
     enumFn = append "    " . enumF
     enumFs = append "  * " . enumF
-    normFormat = curry (map (uncurry append . Arrow.first enumFn) . uncurry enumerate)
+    normFormat = (map (uncurry append . Arrow.first enumFn) .) . enumerate
     selectedFormat x y = (flip append y . enumFs) x
 
     ask aout = do
