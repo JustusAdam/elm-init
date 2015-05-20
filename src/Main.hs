@@ -4,6 +4,7 @@
 module Main (main) where
 
 
+import           Control.Applicative      (pure, (<*>))
 import qualified Control.Arrow            as Arrow (first)
 import           Control.Exception        (IOException, catch)
 import           Data.Aeson               as Aeson (ToJSON, Value, object,
