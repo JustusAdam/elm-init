@@ -10,10 +10,10 @@ import           Data.Aeson               as Aeson (ToJSON, Value, object,
                                                     toJSON, (.=))
 import           Data.Aeson.Encode.Pretty (encodePretty)
 import           Data.Bool                (bool)
-import qualified Data.ByteString          as ByteString (ByteString, empty,
-                                                         hPut)
+import qualified Data.ByteString          as ByteString (ByteString, hPut)
 import qualified Data.ByteString.Lazy     as LBS (hPut)
 import           Data.FileEmbed           (embedFile)
+import           Data.Maybe               (fromMaybe)
 import           Data.Text                as Text (Text, append, intercalate,
                                                    pack, splitOn, unpack)
 import           Data.Text.IO             as TextIO (getLine, putStrLn)
@@ -38,17 +38,17 @@ standardFiles = [ ("README.md", Nothing) ]
 standardSourceFiles :: [(FilePath, Maybe ByteString.ByteString)]
 standardSourceFiles = [ ("Main.elm", Just $(embedFile "resources/Main.elm")) ]
 
-standardLicenses :: [(Text, ByteString.ByteString)]
+standardLicenses :: [(Text, Maybe ByteString.ByteString)]
 standardLicenses =
-  [ ("None", ByteString.empty)
-  , ("BSD3", $(embedFile "resources/licenses/BSD3"))
-  , ("LGPL3", $(embedFile "resources/licenses/LGPL3"))
-  , ("LGPL2", $(embedFile "resources/licenses/LGPL2"))
-  , ("MIT", $(embedFile "resources/licenses/MIT"))
-  , ("Apache", $(embedFile "resources/licenses/Apache"))
-  , ("GPLv2", $(embedFile "resources/licenses/GPLv2"))
-  , ("GPLv3", $(embedFile "resources/licenses/GPLv3"))
-  ] :: [(Text, ByteString.ByteString)]
+  [ ("None"   , Nothing                                       )
+  , ("BSD3"   , Just $(embedFile "resources/licenses/BSD3"   ))
+  , ("LGPL3"  , Just $(embedFile "resources/licenses/LGPL3"  ))
+  , ("LGPL2"  , Just $(embedFile "resources/licenses/LGPL2"  ))
+  , ("MIT"    , Just $(embedFile "resources/licenses/MIT"    ))
+  , ("Apache" , Just $(embedFile "resources/licenses/Apache" ))
+  , ("GPLv2"  , Just $(embedFile "resources/licenses/GPLv2"  ))
+  , ("GPLv3"  , Just $(embedFile "resources/licenses/GPLv3"  ))
+  ]
 
 defaultProjectVersion :: Version
 defaultProjectVersion = Version 1 0 0
@@ -305,9 +305,7 @@ mkFile name defaultFile = exists name >>=
 
 mkSourceFiles :: FilePath -> IO [Result]
 mkSourceFiles sf =
-  mkFiles $ map
-              (Arrow.first (sf </>))
-              standardSourceFiles
+  mkFiles $ map (Arrow.first (sf </>)) standardSourceFiles
 
 
 mkDirs :: FilePath -> [FilePath] -> IO ()
@@ -322,6 +320,9 @@ writeConf wd dec =
     (flip LBS.hPut $ encodePretty $ makePackage dec)
 
 
+flattenMaybe :: Maybe (Maybe a) -> Maybe a
+flattenMaybe = fromMaybe Nothing
+
 putLicense :: FilePath -> Text -> IO Result
 putLicense wd =
   maybe
@@ -332,7 +333,7 @@ putLicense wd =
           (wd </> "LICENSE")
           WriteMode
       . flip ByteString.hPut)
-  . flip lookup standardLicenses
+  . flattenMaybe . flip lookup standardLicenses
 
 
 main :: IO ()
