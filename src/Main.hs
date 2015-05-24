@@ -7,6 +7,7 @@ module Main (main) where
 import           Control.Applicative      (pure, (<*>))
 import qualified Control.Arrow            as Arrow (first)
 import           Control.Exception        (IOException, catch)
+import Control.Monad ((>=>))
 import           Data.Aeson               as Aeson (ToJSON, Value, object,
                                                     toJSON, (.=))
 import           Data.Aeson.Encode.Pretty (encodePretty)
@@ -126,17 +127,17 @@ emptyDecisions :: UserDecisions
 emptyDecisions =
   Default { summary       = ""
           , repository    = ""
-          , version       = Version 1 0 0
+          , version       = Version 0 0 0
           , license       = ""
-          , sourceFolder  = "src"
+          , sourceFolder  = ""
           , projectName   = ""
-          , elmVersion    = defaultElmVersion
+          , elmVersion    = ""
           }
 
 
 makePackage :: UserDecisions -> ElmPackage
-makePackage = pure ElmPackage
-  <*> version
+makePackage = ElmPackage
+  <$> version
   <*> summary
   <*> repository
   <*> license
@@ -150,20 +151,21 @@ enumerate from l = zip [from..(length l)] l
 
 
 getEither :: Read a => a -> IO a
-getEither x =
-  catch readLn (handler x)
+getEither =
+  catch readLn . handler
   where
     handler :: a -> IOException -> IO a
     handler = const . return
 
 
 askChoices :: Text -> Int -> [Text] -> IO Text
-askChoices m s l = fmap (l !!) (askChoices' m s l)
+askChoices =
+  ((fmap <$> (!!) <*>) .) . askChoices'
 
 
 askChoices' :: Text -> Int -> [Text] -> IO Int
-askChoices' message selected choices = do
-  putStrLn message
+askChoices' message selected choices =
+  putStrLn message >>
   ask out
 
   where
@@ -174,51 +176,54 @@ askChoices' message selected choices = do
         (normFormat 1 l1
           ++ (selectedFormat selected selectedElem : normFormat (selected + 1) l2tail))
 
-    enumF x = append (pack $ show x) " )  "
+    enumF = flip append " )  " . pack . show
     enumFn = append "    " . enumF
     enumFs = append "  * " . enumF
     normFormat = (map (uncurry append . Arrow.first enumFn) .) . enumerate
     selectedFormat x y = (flip append y . enumFs) x
 
-    ask aout = do
-          putStrLn aout
-          -- apparently using putStr here doe not print the full string but
-          -- omits the last line ... buffering?
-          i <- getEither selected
-
-          if i <= length choices then
-            return i
-          else do
-            putStrLn "invalid choice, please choose again"
-            ask aout
+    ask =
+          (>>)
+          <$> putStrLn
+          <*> (\a ->
+                getEither selected >>=
+                  (bool
+                    (putStrLn "invalid choice, please choose again" >>
+                    ask a)
+                    <$> return
+                    <*> (<= length choices)))
 
 
 askChoicesWithOther :: Text -> Int -> (Text -> Bool) -> [Text] -> IO Text
-askChoicesWithOther m s verifier l = do
-  i <- askChoices' m s (l ++ ["other (specify)"])
-  if i == length l then
-    getAlternative
-  else
-    return $ l !! i
+askChoicesWithOther m s verifier =
+  (>>=)
+    <$> askChoices' m s . (++ ["other (specify)"])
+    <*> ((\a b -> flip bool getAlternative
+          <$> return . a
+          <*> (== b))
+            <$> (!!)
+            <*> length)
+
+
 
   where
-    getAlternative = do
-      putStrLn "please enter an alternative"
-
-      str <- getLine
-      if verifier str then
-        return str
-      else
-        putStrLn "Invalid input, plese enter again" >>
-        getAlternative
+    getAlternative =
+      putStrLn "please enter an alternative" >>
+      getLine >>=
+        (bool
+          (putStrLn "Invalid input, plese enter again" >>
+          getAlternative)
+        <$> return
+        <*> verifier)
 
 
 exists :: FilePath -> IO Bool
-exists f =
-  doesFileExist f >>=
-  bool
-    (doesDirectoryExist f)
-    (return True)
+exists =
+  (>>=)
+  <$> doesFileExist
+  <*> (flip bool
+        (return True)
+        . doesDirectoryExist)
 
 
 getCmdArgs :: IO CmdArgs
@@ -249,15 +254,15 @@ verifyWD wd =
 
   where
     getResp :: IO Bool
-    getResp = fmap (flip elem ["y", "yes"]) getLine
+    getResp = flip elem ["y", "yes"] <$> getLine
 
     makeDirs = createDirectoryIfMissing True wd
 
 
 getUserDecisions :: FilePath -> IO UserDecisions
 getUserDecisions wd =
-  pure Default
-  <*> askChoicesWithOther
+  Default
+  <$> askChoicesWithOther
         "project name?"
         0
         (const True)
@@ -300,26 +305,26 @@ mkFile name defaultFile = exists name >>=
     (withFile
       name
       WriteMode
-      (\h -> maybe (return ()) (ByteString.hPut h) defaultFile)
+      (flip (maybe (return ())) defaultFile . ByteString.hPut)
     >> return (Right ()))
     (return $ Left $ "file " `append` pack name `append` " already exists")
 
 
 mkSourceFiles :: FilePath -> IO [Result]
-mkSourceFiles sf =
-  mkFiles $ map (Arrow.first (sf </>)) standardSourceFiles
+mkSourceFiles =
+  mkFiles . flip map standardSourceFiles . Arrow.first . (</>)
 
 
 mkDirs :: FilePath -> [FilePath] -> IO ()
-mkDirs wd = mapM_ (createDirectoryIfMissing True . (wd </>))
+mkDirs = mapM_ . (createDirectoryIfMissing True .) . (</>)
 
 
 writeConf :: FilePath -> UserDecisions -> IO ()
-writeConf wd dec =
+writeConf wd =
   withFile
     (wd </> elmConfigName)
     WriteMode
-    (flip LBS.hPut $ encodePretty $ makePackage dec)
+    . flip LBS.hPut . encodePretty . makePackage
 
 
 flattenMaybe :: Maybe (Maybe a) -> Maybe a
