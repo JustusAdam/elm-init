@@ -7,7 +7,7 @@ module Main (main) where
 import           Control.Applicative      (pure, (<*>))
 import qualified Control.Arrow            as Arrow (first)
 import           Control.Exception        (IOException, catch)
-import Control.Monad ((>=>))
+import           Control.Monad            ((>=>))
 import           Data.Aeson               as Aeson (ToJSON, Value, object,
                                                     toJSON, (.=))
 import           Data.Aeson.Encode.Pretty (encodePretty)
@@ -15,6 +15,7 @@ import           Data.Bool                (bool)
 import qualified Data.ByteString          as ByteString (ByteString, hPut)
 import qualified Data.ByteString.Lazy     as LBS (hPut)
 import           Data.FileEmbed           (embedFile)
+import           Data.Functor             ((<$>))
 import           Data.Maybe               (fromMaybe)
 import           Data.Text                as Text (Text, append, intercalate,
                                                    pack, splitOn, unpack)
@@ -198,9 +199,9 @@ askChoicesWithOther :: Text -> Int -> (Text -> Bool) -> [Text] -> IO Text
 askChoicesWithOther m s verifier =
   (>>=)
     <$> askChoices' m s . (++ ["other (specify)"])
-    <*> ((\a b -> flip bool getAlternative
-          <$> return . a
-          <*> (== b))
+    <*> ((\a -> (<*>) (flip bool getAlternative
+          <$> return . a)
+          . (==) )
             <$> (!!)
             <*> length)
 
