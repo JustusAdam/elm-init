@@ -96,6 +96,7 @@ data ElmPackage = ElmPackage { pkgVersion        :: Version
                              , pkgDependencies   :: Aeson.Value
                              , pkgExposedModules :: [Text]
                              , pkgElmVersion     :: Text
+                             , pkgSourceDirs     :: [Text]
                              }
 
 
@@ -108,6 +109,7 @@ instance Aeson.ToJSON ElmPackage where
     , ("dependencies" .=)     . pkgDependencies
     , ("exposed-modules" .=)  . pkgExposedModules
     , ("elm-version" .=)      . pkgElmVersion
+    , ("source-directories".=). pkgSourceDirs
     ]
 
 
@@ -145,6 +147,7 @@ makePackage = ElmPackage
   <*> const (object [])
   <*> const []
   <*> elmVersion
+  <*> (:[]) . pack . sourceFolder
 
 
 enumerate :: Int -> [a] -> [(Int,a)]
@@ -204,8 +207,6 @@ askChoicesWithOther m s verifier =
           . (==) )
             <$> (!!)
             <*> length)
-
-
 
   where
     getAlternative =
@@ -269,7 +270,7 @@ getUserDecisions wd =
         (const True)
         [pack $ takeBaseName wd]
   <*> fmap
-        ((wd </>) . unpack)
+        (unpack)
         (askChoicesWithOther
           "choose a source folder name"
           0
