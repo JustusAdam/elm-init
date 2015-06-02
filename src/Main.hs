@@ -7,16 +7,17 @@ module Main (main) where
 import           Control.Applicative      (pure, (<*>))
 import qualified Control.Arrow            as Arrow (first)
 import           Control.Exception        (IOException, catch)
-import           Control.Monad            ((>=>))
+import           Control.Monad            ((>=>), (<=<))
 import           Data.Aeson               as Aeson (ToJSON, Value, object,
                                                     toJSON, (.=))
 import           Data.Aeson.Encode.Pretty (encodePretty)
+import           Text.ParserCombinators.ReadP (readP_to_S)
 import           Data.Bool                (bool)
 import qualified Data.ByteString          as ByteString (ByteString, hPut)
 import qualified Data.ByteString.Lazy     as LBS (hPut)
 import           Data.FileEmbed           (embedFile)
 import           Data.Functor             ((<$>))
-import           Data.Maybe               (fromMaybe)
+import           Data.Maybe               (fromMaybe, isJust)
 import           Data.Text                as Text (Text, append, intercalate,
                                                    pack, splitOn, unpack)
 import           Data.Text.IO             as TextIO (getLine, putStrLn)
@@ -28,6 +29,8 @@ import           System.Directory         (createDirectoryIfMissing,
 import           System.Environment       (getArgs)
 import           System.FilePath          (isValid, takeBaseName, (</>))
 import           System.IO                (IOMode (WriteMode), withFile)
+import           Data.Version             (parseVersion, Version(..), showVersion,
+                                          makeVersion)
 
 
 standardDirectories :: [FilePath]
@@ -55,7 +58,7 @@ standardLicenses =
   ]
 
 defaultProjectVersion :: Version
-defaultProjectVersion = Version 1 0 0
+defaultProjectVersion = makeVersion [1, 0, 0]
 
 defaultElmVersion :: Text
 defaultElmVersion = "0.15.0 <= v < 0.16.0"
@@ -71,12 +74,6 @@ type Result = Either Text ()
 
 
 data CmdArgs = CmdArgs { workingDirectory :: FilePath }
-
-
-data Version = Version { majorVersion :: Int
-                       , minorVersion :: Int
-                       , fineVersion  :: Int
-                       }
 
 
 data UserDecisions = Default { projectName  :: Text
@@ -100,9 +97,13 @@ data ElmPackage = ElmPackage { pkgVersion        :: Version
                              }
 
 
+readVersion :: String -> [(Version, String)]
+readVersion = readP_to_S parseVersion
+
+
 instance Aeson.ToJSON ElmPackage where
   toJSON = object . sequenceA
-    [ ("version" .=)          . show . pkgVersion
+    [ ("version" .=)          . showVersion . pkgVersion
     , ("summary" .=)          . pkgSummary
     , ("repository" .=)       . pkgRepository
     , ("license" .=)          . pkgLicense
@@ -113,24 +114,11 @@ instance Aeson.ToJSON ElmPackage where
     ]
 
 
-instance Show Version where
-  showsPrec _ (Version ma mi fi) =
-    shows ma . showChar '.' . shows mi . showChar '.' . shows fi
-
-
-versionFromString :: Text -> Version
-versionFromString s
-  | length sp /= 3  = error "Parse failed"  -- I'm so sorry
-  | otherwise       = Version ma mi fi
-  where
-    sp@[ma,mi,fi] = map (read.unpack) (splitOn "." s) :: [Int]
-
-
 emptyDecisions :: UserDecisions
 emptyDecisions =
   Default { summary       = ""
           , repository    = ""
-          , version       = Version 0 0 0
+          , version       = makeVersion [0, 0, 0]
           , license       = ""
           , sourceFolder  = ""
           , projectName   = ""
@@ -198,25 +186,22 @@ askChoices' message selected choices =
                     <*> (<= length choices)))
 
 
-askChoicesWithOther :: Text -> Int -> (Text -> Bool) -> [Text] -> IO Text
-askChoicesWithOther m s verifier =
-  (>>=)
-    <$> askChoices' m s . (++ ["other (specify)"])
-    <*> ((\a -> (<*>) (flip bool getAlternative
-          <$> return . a)
-          . (==) )
-            <$> (!!)
-            <*> length)
+askChoicesWithOther :: Text -> Int -> (Text -> Maybe a) -> [Text] -> IO a
+askChoicesWithOther m s trans l =
+    askChoices' m s (l ++ ["other (specify)"])
+    >>= (flip bool getAlternative
+          <$> maybe (error "No parse") return . trans . (l !!)
+          <*> (== length l))
 
   where
     getAlternative =
       putStrLn "please enter an alternative" >>
       getLine >>=
-        (bool
+        (maybe
           (putStrLn "Invalid input, plese enter again" >>
           getAlternative)
-        <$> return
-        <*> verifier)
+          return
+          . trans)
 
 
 exists :: FilePath -> IO Bool
@@ -261,39 +246,49 @@ verifyWD wd =
     makeDirs = createDirectoryIfMissing True wd
 
 
+readOneVersion :: String -> Maybe Version
+readOneVersion = verif . readVersion
+  where
+    verif ((v, []):_) = Just v
+    verif (_:[])      = Nothing
+    verif (_:xs)      = verif xs
+
+verifyElmVersion :: String -> Maybe Version
+verifyElmVersion = hasElmStructure <=< readOneVersion
+  where
+    hasElmStructure v@(Version [ _, _, _ ] []) = Just v
+    hasElmStructure _                          = Nothing
+
+
 getUserDecisions :: FilePath -> IO UserDecisions
 getUserDecisions wd =
   Default
   <$> askChoicesWithOther
         "project name?"
         0
-        (const True)
+        (Just)
         [pack $ takeBaseName wd]
-  <*> fmap
-        (unpack)
-        (askChoicesWithOther
-          "choose a source folder name"
-          0
-          (isValid . unpack)  -- filepath path verifier
-          (map pack standardSourceFolders))
-  <*> fmap
-        versionFromString
-        (askChoicesWithOther
-          "initial project version?"
-          0
-          (const True)  -- TODO add verifier
-          [pack $ show defaultProjectVersion])
+  <*> askChoicesWithOther
+        "choose a source folder name"
+        0
+        ((bool Nothing <$> Just <*> isValid) . unpack)  -- filepath path verifier
+        (map pack standardSourceFolders)
+  <*> askChoicesWithOther
+        "initial project version?"
+        0
+        (verifyElmVersion . unpack)  -- TODO add verifier
+        [pack $ showVersion defaultProjectVersion]
   <*> (putStrLn "a quick summary" >> getLine)
   <*> (putStrLn "project repository url" >> getLine)
   <*> askChoicesWithOther
         "choose a license"
         0
-        (const True)
+        Just
         availableLicenses
   <*> askChoicesWithOther
         "select the elm-version"
         0
-        (const True)  -- add verifier?
+        (Just)  -- add verifier?
         [defaultElmVersion]
 
 
