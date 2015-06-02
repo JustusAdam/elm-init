@@ -13,9 +13,3 @@ update : Action -> Model -> Model
 update action model =
   case action of
     Reset -> model
-
-
--- VIEW
-
-view : Model -> Html
-view model = div [] []

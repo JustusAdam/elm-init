@@ -23,7 +23,8 @@ import           Data.Version             (Version(..), showVersion,
                                           makeVersion)
 import           ElmInit                  (Result, UserDecisions(..),
                                           CmdArgs(..), askChoicesWithOther,
-                                          exists, verifyElmVersion, makePackage, flattenMaybe)
+                                          exists, verifyElmVersion, makePackage,
+                                          flattenMaybe)
 
 
 standardDirectories :: [FilePath]
@@ -83,11 +84,11 @@ verifyWD wd =
           (putStrLn "the chosen directory does not exist yet, shall I create it? [y/n]"
           >> getResp >>=
             bool
-              (error "the chosen directory does not exist")  -- I'm so sorry
+              (error "Project directory does not exist")  -- I'm so sorry
               makeDirs
           >> return wd)
           (return wd))
-      (error "The chosen directory is a file") -- I'm so sorry
+      (error "The chosen directory is a file, you'll have to choose a different name") -- I'm so sorry
 
   where
     getResp :: IO Bool

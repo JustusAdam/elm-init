@@ -2,6 +2,7 @@
 
 module ElmInit.Interact
   ( askChoicesWithOther
+  , askChoices
   ) where
 
 
@@ -39,16 +40,14 @@ askChoices' message selected choices =
     normFormat = (map (uncurry append . Arrow.first enumFn) .) . enumerate
     selectedFormat x y = (flip append y . enumFs) x
 
-    ask =
-          (>>)
-          <$> putStrLn
-          <*> (\a ->
-                getOr selected >>=
-                  (bool
-                    (putStrLn "invalid choice, please choose again" >>
-                    ask a)
-                    <$> return
-                    <*> (<= length choices)))
+    ask a =
+      putStrLn a >>
+      getOr selected >>=
+        (bool
+          (putStrLn "invalid choice, please choose again" >>
+          ask a)
+          <$> return
+          <*> (<= length choices))
 
 
 askChoicesWithOther :: Text -> Int -> (Text -> Maybe a) -> [Text] -> IO a
