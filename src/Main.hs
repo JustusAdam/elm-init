@@ -4,24 +4,14 @@
 module Main (main) where
 
 
-import           Control.Applicative      (pure, (<*>))
-import qualified Control.Arrow            as Arrow (first)
-import           Control.Exception        (IOException, catch)
-import           Control.Monad            ((>=>), (<=<))
-import           Data.Aeson               as Aeson (ToJSON, Value, object,
-                                                    toJSON, (.=))
+import           Control.Arrow            as Arrow (first)
 import           Data.Aeson.Encode.Pretty (encodePretty)
-import           Text.ParserCombinators.ReadP (readP_to_S)
 import           Data.Bool                (bool)
 import qualified Data.ByteString          as ByteString (ByteString, hPut)
 import qualified Data.ByteString.Lazy     as LBS (hPut)
 import           Data.FileEmbed           (embedFile)
-import           Data.Functor             ((<$>))
-import           Data.Maybe               (fromMaybe, isJust)
-import           Data.Text                as Text (Text, append, intercalate,
-                                                   pack, splitOn, unpack)
+import           Data.Text                as Text (Text, append, pack, unpack)
 import           Data.Text.IO             as TextIO (getLine, putStrLn)
-import           Data.Traversable         (sequenceA)
 import           Prelude                  hiding (getLine, putStrLn)
 import           System.Directory         (createDirectoryIfMissing,
                                            doesDirectoryExist, doesFileExist,
@@ -29,8 +19,11 @@ import           System.Directory         (createDirectoryIfMissing,
 import           System.Environment       (getArgs)
 import           System.FilePath          (isValid, takeBaseName, (</>))
 import           System.IO                (IOMode (WriteMode), withFile)
-import           Data.Version             (parseVersion, Version(..), showVersion,
+import           Data.Version             (Version(..), showVersion,
                                           makeVersion)
+import           ElmInit                  (Result, UserDecisions(..),
+                                          CmdArgs(..), askChoicesWithOther,
+                                          exists, verifyElmVersion, makePackage, flattenMaybe)
 
 
 standardDirectories :: [FilePath]
@@ -70,149 +63,6 @@ elmConfigName :: FilePath
 elmConfigName = "elm-package.json"
 
 
-type Result = Either Text ()
-
-
-data CmdArgs = CmdArgs { workingDirectory :: FilePath }
-
-
-data UserDecisions = Default { projectName  :: Text
-                             , sourceFolder :: FilePath
-                             , version      :: Version
-                             , summary      :: Text
-                             , repository   :: Text
-                             , license      :: Text
-                             , elmVersion   :: Text
-                             }
-
-
-data ElmPackage = ElmPackage { pkgVersion        :: Version
-                             , pkgSummary        :: Text
-                             , pkgRepository     :: Text
-                             , pkgLicense        :: Text
-                             , pkgDependencies   :: Aeson.Value
-                             , pkgExposedModules :: [Text]
-                             , pkgElmVersion     :: Text
-                             , pkgSourceDirs     :: [Text]
-                             }
-
-
-readVersion :: String -> [(Version, String)]
-readVersion = readP_to_S parseVersion
-
-
-instance Aeson.ToJSON ElmPackage where
-  toJSON = object . sequenceA
-    [ ("version" .=)          . showVersion . pkgVersion
-    , ("summary" .=)          . pkgSummary
-    , ("repository" .=)       . pkgRepository
-    , ("license" .=)          . pkgLicense
-    , ("dependencies" .=)     . pkgDependencies
-    , ("exposed-modules" .=)  . pkgExposedModules
-    , ("elm-version" .=)      . pkgElmVersion
-    , ("source-directories".=). pkgSourceDirs
-    ]
-
-
-emptyDecisions :: UserDecisions
-emptyDecisions =
-  Default { summary       = ""
-          , repository    = ""
-          , version       = makeVersion [0, 0, 0]
-          , license       = ""
-          , sourceFolder  = ""
-          , projectName   = ""
-          , elmVersion    = ""
-          }
-
-
-makePackage :: UserDecisions -> ElmPackage
-makePackage = ElmPackage
-  <$> version
-  <*> summary
-  <*> repository
-  <*> license
-  <*> const (object [])
-  <*> const []
-  <*> elmVersion
-  <*> (:[]) . pack . sourceFolder
-
-
-enumerate :: Int -> [a] -> [(Int,a)]
-enumerate from l = zip [from..(length l)] l
-
-
-getEither :: Read a => a -> IO a
-getEither =
-  catch readLn . handler
-  where
-    handler :: a -> IOException -> IO a
-    handler = const . return
-
-
-askChoices :: Text -> Int -> [Text] -> IO Text
-askChoices =
-  ((fmap <$> (!!) <*>) .) . askChoices'
-
-
-askChoices' :: Text -> Int -> [Text] -> IO Int
-askChoices' message selected choices =
-  putStrLn message >>
-  ask out
-
-  where
-    (l1, selectedElem : l2tail) = splitAt selected choices
-    out =
-      intercalate
-        "\n"
-        (normFormat 1 l1
-          ++ (selectedFormat selected selectedElem : normFormat (selected + 1) l2tail))
-
-    enumF = flip append " )  " . pack . show
-    enumFn = append "    " . enumF
-    enumFs = append "  * " . enumF
-    normFormat = (map (uncurry append . Arrow.first enumFn) .) . enumerate
-    selectedFormat x y = (flip append y . enumFs) x
-
-    ask =
-          (>>)
-          <$> putStrLn
-          <*> (\a ->
-                getEither selected >>=
-                  (bool
-                    (putStrLn "invalid choice, please choose again" >>
-                    ask a)
-                    <$> return
-                    <*> (<= length choices)))
-
-
-askChoicesWithOther :: Text -> Int -> (Text -> Maybe a) -> [Text] -> IO a
-askChoicesWithOther m s trans l =
-    askChoices' m s (l ++ ["other (specify)"])
-    >>= (flip bool getAlternative
-          <$> maybe (error "No parse") return . trans . (l !!)
-          <*> (== length l))
-
-  where
-    getAlternative =
-      putStrLn "please enter an alternative" >>
-      getLine >>=
-        (maybe
-          (putStrLn "Invalid input, plese enter again" >>
-          getAlternative)
-          return
-          . trans)
-
-
-exists :: FilePath -> IO Bool
-exists =
-  (>>=)
-  <$> doesFileExist
-  <*> (flip bool
-        (return True)
-        . doesDirectoryExist)
-
-
 getCmdArgs :: IO CmdArgs
 getCmdArgs =
   fmap CmdArgs
@@ -244,20 +94,6 @@ verifyWD wd =
     getResp = flip elem ["y", "yes"] <$> getLine
 
     makeDirs = createDirectoryIfMissing True wd
-
-
-readOneVersion :: String -> Maybe Version
-readOneVersion = verif . readVersion
-  where
-    verif ((v, []):_) = Just v
-    verif (_:[])      = Nothing
-    verif (_:xs)      = verif xs
-
-verifyElmVersion :: String -> Maybe Version
-verifyElmVersion = hasElmStructure <=< readOneVersion
-  where
-    hasElmStructure v@(Version [ _, _, _ ] []) = Just v
-    hasElmStructure _                          = Nothing
 
 
 getUserDecisions :: FilePath -> IO UserDecisions
@@ -324,8 +160,7 @@ writeConf wd =
     . flip LBS.hPut . encodePretty . makePackage
 
 
-flattenMaybe :: Maybe (Maybe a) -> Maybe a
-flattenMaybe = fromMaybe Nothing
+
 
 putLicense :: FilePath -> Text -> IO Result
 putLicense wd =
