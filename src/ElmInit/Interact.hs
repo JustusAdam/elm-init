@@ -7,6 +7,7 @@ module ElmInit.Interact
 
 
 import qualified Control.Arrow            as Arrow (first)
+import           Control.Applicative      ((<$>), (<*>))
 import           Data.Text                (append)
 import           Data.Bool                (bool)
 import           ElmInit.Util             (getOr)

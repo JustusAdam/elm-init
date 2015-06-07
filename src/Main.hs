@@ -5,6 +5,7 @@ module Main (main) where
 
 
 import           Control.Arrow            as Arrow (first)
+import           Control.Applicative      ((<$>), (<*>))
 import           Data.Aeson.Encode.Pretty (encodePretty)
 import           Data.Bool                (bool)
 import qualified Data.ByteString          as ByteString (ByteString, hPut)

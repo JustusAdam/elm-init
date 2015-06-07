@@ -6,10 +6,11 @@ module ElmInit.Util
   ) where
 
 
-import           Data.Maybe        (fromMaybe)
-import           Data.Bool         (bool)
-import           System.Directory  (doesFileExist, doesDirectoryExist)
-import           Control.Exception (catch, IOException)
+import           Control.Applicative ((<$>), (<*>))
+import           Data.Maybe          (fromMaybe)
+import           Data.Bool           (bool)
+import           System.Directory    (doesFileExist, doesDirectoryExist)
+import           Control.Exception   (catch, IOException)
 
 
 flattenMaybe :: Maybe (Maybe a) -> Maybe a
