@@ -2,6 +2,7 @@ module ElmInit
   ( UserDecisions(..)
   , CmdArgs(..)
   , Result
+  , askChoices
   , askChoicesWithOther
   , exists
   , verifyElmVersion

@@ -36,6 +36,8 @@ data UserDecisions = Default { projectName  :: Text
                              , repository   :: Text
                              , license      :: Text
                              , elmVersion   :: Text
+                             , mainFileName :: String
+                             , addIndex     :: Bool
                              }
 
 
@@ -76,6 +78,8 @@ emptyDecisions =
           , sourceFolder  = ""
           , projectName   = ""
           , elmVersion    = ""
+          , mainFileName  = "Main.elm"
+          , addIndex      = True
           }
 
 
@@ -85,7 +89,7 @@ makePackage = ElmPackage
   <*> summary
   <*> repository
   <*> license
-  <*> const (object [])
+  <*> const (object [("elm-lang/core", "2.0.0 <= v < 3.0.0")])
   <*> const []
   <*> elmVersion
   <*> (:[]) . pack . sourceFolder

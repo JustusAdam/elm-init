@@ -8,7 +8,8 @@ import           Control.Arrow            as Arrow (first)
 import           Control.Applicative      ((<$>), (<*>))
 import           Data.Aeson.Encode.Pretty (encodePretty)
 import           Data.Bool                (bool)
-import qualified Data.ByteString          as ByteString (ByteString, hPut)
+import qualified Data.ByteString          as ByteString (ByteString, hPut,)
+import qualified Data.ByteString.Char8    as CBS (pack, unpack)
 import qualified Data.ByteString.Lazy     as LBS (hPut)
 import           Data.FileEmbed           (embedFile)
 import           Data.Text                as Text (Text, append, pack, unpack)
@@ -18,14 +19,16 @@ import           System.Directory         (createDirectoryIfMissing,
                                            doesDirectoryExist, doesFileExist,
                                            getCurrentDirectory, makeAbsolute)
 import           System.Environment       (getArgs)
-import           System.FilePath          (isValid, takeBaseName, (</>))
+import           System.FilePath          (isValid, takeBaseName, (</>), takeExtension)
 import           System.IO                (IOMode (WriteMode), withFile)
 import           Data.Version             (Version(..), showVersion,
                                           makeVersion)
 import           ElmInit                  (Result, UserDecisions(..),
                                           CmdArgs(..), askChoicesWithOther,
                                           exists, verifyElmVersion, makePackage,
-                                          flattenMaybe)
+                                          flattenMaybe, askChoices)
+import          Text.Printf               (printf)
+import          Data.Char                 (isUpper)
 
 
 standardDirectories :: [FilePath]
@@ -38,7 +41,13 @@ standardFiles :: [(FilePath, Maybe ByteString.ByteString)]
 standardFiles = [ ("README.md", Nothing) ]
 
 standardSourceFiles :: [(FilePath, Maybe ByteString.ByteString)]
-standardSourceFiles = [ ("Main.elm", Just $(embedFile "resources/Main.elm")) ]
+standardSourceFiles = []
+
+mainFile :: String -> ByteString.ByteString
+mainFile = CBS.pack . printf (CBS.unpack $(embedFile "resources/Main.elm"))
+
+indexHtml :: String -> ByteString.ByteString
+indexHtml = CBS.pack . printf (CBS.unpack $(embedFile "resources/index.html"))
 
 standardLicenses :: [(Text, Maybe ByteString.ByteString)]
 standardLicenses =
@@ -104,7 +113,7 @@ getUserDecisions wd =
   <$> askChoicesWithOther
         "project name?"
         0
-        (Just)
+        Just
         [pack $ takeBaseName wd]
   <*> askChoicesWithOther
         "choose a source folder name"
@@ -126,8 +135,24 @@ getUserDecisions wd =
   <*> askChoicesWithOther
         "select the elm-version"
         0
-        (Just)  -- add verifier?
+        Just  -- add verifier?
         [defaultElmVersion]
+  <*> askChoicesWithOther
+        "What sould be the Main file?"
+        0
+        ((bool Nothing <$> Just <*> isValidMainFile) . unpack)
+        ["Main.elm"]
+  <*> ((== "Yes") <$> askChoices
+        "Should I create an index.html file?"
+        0
+        ["Yes", "No"]
+      )
+
+
+isValidMainFile :: String -> Bool
+isValidMainFile file =
+  not (null file) && isUpper (head file) && ".elm" == takeExtension file
+
 
 
 mkFiles :: [(FilePath, Maybe ByteString.ByteString)] -> IO [Result]
@@ -145,9 +170,15 @@ mkFile name defaultFile = exists name >>=
     (return $ Left $ "file " `append` pack name `append` " already exists")
 
 
-mkSourceFiles :: FilePath -> IO [Result]
-mkSourceFiles =
-  mkFiles . flip map standardSourceFiles . Arrow.first . (</>)
+mkSourceFiles :: FilePath -> UserDecisions -> IO [Result]
+mkSourceFiles wd (Default { mainFileName = mfn, sourceFolder = sourceF, addIndex = makeIndex }) = do
+  let mainModule = takeBaseName mfn
+  mainFileRes <- mkFile (wd  </> sourceF </> mfn) $ Just $ mainFile mainModule
+  indexFileRes <- if makeIndex
+    then  mkFile (wd </> "index.html") $ Just $ indexHtml mainModule
+    else return $ return ()
+  others <- mkFiles $ flip map standardSourceFiles $ Arrow.first ((wd </> sourceF) </>)
+  return $ mainFileRes:indexFileRes:others
 
 
 mkDirs :: FilePath -> [FilePath] -> IO ()
@@ -193,7 +224,7 @@ main = do
   resStatic <- mkFiles $ map (Arrow.first (wd </>)) standardFiles
 
   -- create Elm source files, collect errors
-  resSource <- mkSourceFiles $ wd </> sourceFolder decisions
+  resSource <- mkSourceFiles wd decisions
 
   -- write the package config based on the user decisions
   writeConf wd decisions
