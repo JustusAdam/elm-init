@@ -50,19 +50,22 @@ askChoices' message selected choices =
           <*> (<= length choices))
 
 
-askChoicesWithOther :: Text -> Int -> (Text -> Maybe a) -> [Text] -> IO a
+askChoicesWithOther :: Text -> Int -> (Text -> Either Text a) -> [Text] -> IO a
 askChoicesWithOther m s trans l =
     askChoices' m s (l ++ ["other (specify)"])
     >>= (flip bool getAlternative
-          <$> maybe (error "No parse") return . trans . (l !!)
+          <$> either (const $ error "No parse") return . trans . (l !!)
           <*> (== length l))
 
   where
     getAlternative =
       putStrLn "please enter an alternative" >>
       getLine >>=
-        (maybe
-          (putStrLn "Invalid input, plese enter again" >>
-          getAlternative)
+        (either
+          (\message ->
+            putStrLn "Invalid input:" >>
+            putStrLn message >>
+            getAlternative
+          )
           return
           . trans)

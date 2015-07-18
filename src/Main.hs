@@ -113,34 +113,34 @@ getUserDecisions wd =
   <$> askChoicesWithOther
         "project name?"
         0
-        Just
+        return
         [pack $ takeBaseName wd]
   <*> askChoicesWithOther
         "choose a source folder name"
         0
-        ((bool Nothing <$> Just <*> isValid) . unpack)  -- filepath path verifier
+        ((bool (Left "The filepath must be valid") <$> return <*> isValid) . unpack)  -- filepath path verifier
         (map pack standardSourceFolders)
   <*> askChoicesWithOther
         "initial project version?"
         0
-        (verifyElmVersion . unpack)  -- TODO add verifier
+        (verifyElmVersion . unpack)
         [pack $ showVersion defaultProjectVersion]
   <*> (putStrLn "a quick summary" >> getLine)
   <*> (putStrLn "project repository url" >> getLine)
   <*> askChoicesWithOther
         "choose a license"
         0
-        Just
+        return
         availableLicenses
   <*> askChoicesWithOther
         "select the elm-version"
         0
-        Just  -- add verifier?
+        return
         [defaultElmVersion]
   <*> askChoicesWithOther
         "What sould be the Main file?"
         0
-        ((bool Nothing <$> Just <*> isValidMainFile) . unpack)
+        (isValidMainFile . unpack)
         ["Main.elm"]
   <*> ((== "Yes") <$> askChoices
         "Should I create an index.html file?"
@@ -149,10 +149,12 @@ getUserDecisions wd =
       )
 
 
-isValidMainFile :: String -> Bool
-isValidMainFile file =
-  not (null file) && isUpper (head file) && ".elm" == takeExtension file
-
+isValidMainFile :: String -> Either Text String
+isValidMainFile file
+  | null file = Left "Filename cannot be 𝜖"
+  | not $ isUpper (head file) = Left "Module names (and their files) have to start with uppercase"
+  | ".elm" /= takeExtension file = Left "Elm modules (such as this main file) have to end with the fileending \".elm\""
+  | otherwise = return file
 
 
 mkFiles :: [(FilePath, Maybe ByteString.ByteString)] -> IO [Result]

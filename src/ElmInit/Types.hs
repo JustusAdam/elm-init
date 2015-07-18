@@ -95,15 +95,16 @@ makePackage = ElmPackage
   <*> (:[]) . pack . sourceFolder
 
 
-readOneVersion :: String -> Maybe Version
+readOneVersion :: String -> Either Text Version
 readOneVersion = verif . readVersion
   where
-    verif ((v, []):_) = Just v
-    verif []          = Nothing
+    verif ((v, []):_) = return v
+    verif []          = Left "Version must have this structure: 1.2.3"
     verif (_:xs)      = verif xs
 
-verifyElmVersion :: String -> Maybe Version
+
+verifyElmVersion :: String -> Either Text Version
 verifyElmVersion = hasElmStructure <=< readOneVersion
   where
-    hasElmStructure v@(Version [ _, _, _ ] []) = Just v
-    hasElmStructure _                          = Nothing
+    hasElmStructure v@(Version [ _, _, _ ] []) = Right v
+    hasElmStructure _                          = Left "Version must have this structure: 1.2.3"
