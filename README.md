@@ -1,6 +1,6 @@
 # elm-init [![Build Status](https://travis-ci.org/JustusAdam/elm-init.svg?branch=master)](https://travis-ci.org/JustusAdam/elm-init) [![Hackage version](https://img.shields.io/hackage/v/elm-init.svg)](https://hackage.haskell.org/package/elm-init)
 
-Initialize a new empty [Elm](//elm-lang.org) project.
+Initialize a new empty [Elm](http://elm-lang.org) project.
 
 ## Features
 
@@ -15,7 +15,7 @@ Including:
 
 ## Install
 
-Install the package from the [Hackage](//hackage.haskell.org/packages/elm-init) with `cabal install elm-init`.
+Install the package from the [Hackage](https://hackage.haskell.org/package/elm-init) with `cabal install elm-init`.
 
 ## Use
 
