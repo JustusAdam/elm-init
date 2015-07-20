@@ -1,20 +1,15 @@
 module ElmInit.Util
-  ( flattenMaybe
-  , exists
+  ( exists
   , getOr
   , enumerate
   ) where
 
 
 import           Control.Applicative ((<$>), (<*>))
-import           Data.Maybe          (fromMaybe)
+import           Control.Exception   (IOException, catch)
 import           Data.Bool           (bool)
-import           System.Directory    (doesFileExist, doesDirectoryExist)
-import           Control.Exception   (catch, IOException)
-
-
-flattenMaybe :: Maybe (Maybe a) -> Maybe a
-flattenMaybe = fromMaybe Nothing
+import           Data.Maybe          (fromMaybe)
+import           System.Directory    (doesDirectoryExist, doesFileExist)
 
 
 exists :: FilePath -> IO Bool

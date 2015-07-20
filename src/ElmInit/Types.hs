@@ -12,13 +12,13 @@ module ElmInit.Types
   ) where
 
 
-import           Data.Aeson                   as Aeson (ToJSON, object, (.=),
-                                              toJSON, Value)
-import           Control.Applicative          ((<*>), (<$>))
+import           Control.Applicative          ((<$>), (<*>))
 import           Control.Monad                ((<=<))
-import           Data.Version                 (Version(Version), makeVersion,
-                                              showVersion, parseVersion)
-import           Data.Text                    (pack, Text)
+import           Data.Aeson                   as Aeson (ToJSON, Value, object,
+                                                        toJSON, (.=))
+import           Data.Text                    (Text, pack)
+import           Data.Version                 (Version (Version), makeVersion,
+                                               parseVersion, showVersion)
 import           Text.ParserCombinators.ReadP (readP_to_S)
 
 

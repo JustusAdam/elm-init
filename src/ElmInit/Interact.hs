@@ -6,14 +6,14 @@ module ElmInit.Interact
   ) where
 
 
-import qualified Control.Arrow            as Arrow (first)
-import           Control.Applicative      ((<$>), (<*>))
-import           Data.Text                (append)
-import           Data.Bool                (bool)
-import           ElmInit.Util             (getOr, enumerate)
-import           Data.Text                as Text (Text, intercalate, pack)
-import           Data.Text.IO             as TextIO (getLine, putStrLn)
-import           Prelude                  hiding (getLine, putStrLn)
+import           Control.Applicative ((<$>), (<*>))
+import qualified Control.Arrow       as Arrow (first)
+import           Data.Bool           (bool)
+import           Data.Text           (append)
+import           Data.Text           as Text (Text, intercalate, pack)
+import           Data.Text.IO        as TextIO (getLine, putStrLn)
+import           ElmInit.Util        (enumerate, getOr)
+import           Prelude             hiding (getLine, putStrLn)
 
 
 askChoices :: Text -> Int -> [Text] -> IO Text

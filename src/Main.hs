@@ -4,31 +4,34 @@
 module Main (main) where
 
 
-import           Control.Arrow            as Arrow (first)
 import           Control.Applicative      ((<$>), (<*>))
+import           Control.Arrow            as Arrow (first)
+import           Control.Monad            (join)
 import           Data.Aeson.Encode.Pretty (encodePretty)
 import           Data.Bool                (bool)
-import qualified Data.ByteString          as ByteString (ByteString, hPut,)
+import qualified Data.ByteString          as ByteString (ByteString, hPut)
 import qualified Data.ByteString.Char8    as CBS (pack, unpack)
 import qualified Data.ByteString.Lazy     as LBS (hPut)
+import           Data.Char                (isUpper)
 import           Data.FileEmbed           (embedFile)
 import           Data.Text                as Text (Text, append, pack, unpack)
-import           Data.Text.IO             as TextIO (getLine, putStrLn)
-import           Prelude                  hiding (getLine, putStrLn)
+import qualified Data.Text.IO             as TextIO (getLine, putStrLn)
+import           Data.Time
+import           Data.Version             (Version (..), makeVersion,
+                                           showVersion)
+import           ElmInit                  (CmdArgs (..), Result,
+                                           UserDecisions (..), askChoices,
+                                           askChoicesWithOther, exists,
+                                           makePackage, verifyElmVersion)
+import           Prelude                  hiding (putStrLn)
 import           System.Directory         (createDirectoryIfMissing,
                                            doesDirectoryExist, doesFileExist,
                                            getCurrentDirectory, makeAbsolute)
 import           System.Environment       (getArgs)
-import           System.FilePath          (isValid, takeBaseName, (</>), takeExtension)
+import           System.FilePath          (isValid, takeBaseName, takeExtension,
+                                           (</>))
 import           System.IO                (IOMode (WriteMode), withFile)
-import           Data.Version             (Version(..), showVersion,
-                                          makeVersion)
-import           ElmInit                  (Result, UserDecisions(..),
-                                          CmdArgs(..), askChoicesWithOther,
-                                          exists, verifyElmVersion, makePackage,
-                                          flattenMaybe, askChoices)
-import          Text.Printf               (printf)
-import          Data.Char                 (isUpper)
+import           Text.Printf              (printf)
 
 
 standardDirectories :: [FilePath]
@@ -91,7 +94,7 @@ verifyWD wd =
     bool
       (doesDirectoryExist wd >>=
         bool
-          (putStrLn "the chosen directory does not exist yet, shall I create it? [y/n]"
+          (TextIO.putStrLn "the chosen directory does not exist yet, shall I create it? [y/N]"
           >> getResp >>=
             bool
               (error "Project directory does not exist")  -- I'm so sorry
@@ -102,14 +105,13 @@ verifyWD wd =
 
   where
     getResp :: IO Bool
-    getResp = flip elem ["y", "yes"] <$> getLine
+    getResp = flip elem ["y", "yes"] <$> TextIO.getLine
 
     makeDirs = createDirectoryIfMissing True wd
 
 
 getUserDecisions :: FilePath -> IO UserDecisions
-getUserDecisions wd =
-  Default
+getUserDecisions wd = Default
   <$> askChoicesWithOther
         "project name?"
         0
@@ -125,8 +127,8 @@ getUserDecisions wd =
         0
         (verifyElmVersion . unpack)
         [pack $ showVersion defaultProjectVersion]
-  <*> (putStrLn "a quick summary" >> getLine)
-  <*> (putStrLn "project repository url" >> getLine)
+  <*> (TextIO.putStrLn "a quick summary" >> TextIO.getLine)
+  <*> (TextIO.putStrLn "project repository url" >> TextIO.getLine)
   <*> askChoicesWithOther
         "choose a license"
         0
@@ -177,7 +179,7 @@ mkSourceFiles wd (Default { mainFileName = mfn, sourceFolder = sourceF, addIndex
   let mainModule = takeBaseName mfn
   mainFileRes <- mkFile (wd  </> sourceF </> mfn) $ Just $ mainFile mainModule
   indexFileRes <- if makeIndex
-    then  mkFile (wd </> "index.html") $ Just $ indexHtml mainModule
+    then mkFile (wd </> "index.html") $ Just $ indexHtml mainModule
     else return $ return ()
   others <- mkFiles $ flip map standardSourceFiles $ Arrow.first ((wd </> sourceF) </>)
   return $ mainFileRes:indexFileRes:others
@@ -195,19 +197,19 @@ writeConf wd =
     . flip LBS.hPut . encodePretty . makePackage
 
 
-
-
-putLicense :: FilePath -> Text -> IO Result
-putLicense wd =
-  maybe
-    (return $ Left "License file not found")
-    (fmap
-      Right
-      . withFile
-          (wd </> "LICENSE")
-          WriteMode
-      . flip ByteString.hPut)
-  . flattenMaybe . flip lookup standardLicenses
+putLicense :: FilePath -> Text -> IO ()
+putLicense wd name =
+  case join $ lookup name standardLicenses of
+    Nothing -> return ()
+    Just contents -> do
+      TextIO.putStrLn "The project owner(s): (for the license)"
+      authors <- getLine
+      (year, _, _) <- toGregorian . utctDay <$> getCurrentTime
+      writeFile (wd </> "LICENSE") $
+        printf (CBS.unpack contents) year $
+          if null authors
+            then "[project owners]"
+            else authors
 
 
 main :: IO ()
@@ -235,4 +237,4 @@ main = do
   _         <- putLicense wd (license decisions)
 
   -- report all errors
-  mapM_ (either putStrLn return) (resStatic ++ resSource)
+  mapM_ (either TextIO.putStrLn return) (resStatic ++ resSource)
