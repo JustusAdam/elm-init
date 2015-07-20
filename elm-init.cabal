@@ -8,22 +8,25 @@ description:
   Initialize a new empty elm project with some basic scaffolding according to 'https://github.com/evancz/elm-architecture-tutorial'.
 license:             MIT
 license-file:        LICENSE
-author:              justusadam
+author:              Justus Adam
 maintainer:          dev@justus.science
 -- copyright:
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
-extra-source-files:
-  resources/Main.elm
-  resources/licenses/Apache
-  resources/licenses/BSD3
-  resources/licenses/LGPL2
-  resources/licenses/LGPL3
-  resources/licenses/MIT
-  resources/licenses/GPLv3
-  resources/licenses/GPLv2
-  resources/index.html
+
+Data-dir: resources
+
+Data-files:
+  Main.elm
+  licenses/Apache
+  licenses/BSD3
+  licenses/LGPL2
+  licenses/LGPL3
+  licenses/MIT
+  licenses/GPLv3
+  licenses/GPLv2
+  index.html
 
 
 executable elm-init
@@ -57,4 +60,4 @@ source-repository this
   type:     git
   branch:   master
   location: git://github.com/JustusAdam/elm-init.git
-  tag:      1.0.0.0
+  tag:      1.0.0.2

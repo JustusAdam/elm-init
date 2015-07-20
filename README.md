@@ -6,7 +6,7 @@ Initialize a new empty [Elm](http://elm-lang.org) project.
 
 Interactive setup tool for a new Elm project.
 
-This tool basically helps you populate your `elm-package.json` file.
+This tool basically helps you populate your "elm-package.json" file.
 
 Including:
 
