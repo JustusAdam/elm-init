@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                elm-init
-version:             1.0.0.2
+version:             1.0.1.0
 synopsis:            Set up basic structure for an elm project
 description:
   Initialize a new empty elm project with some basic scaffolding according to 'https://github.com/evancz/elm-architecture-tutorial'.
@@ -19,7 +19,13 @@ Data-dir: resources
 
 Data-files:
   Main.elm
-  licenses/*
+  licenses/Apache
+  licenses/BSD3
+  licenses/GPLv2
+  licenses/GPLv3
+  licenses/LGPL2
+  licenses/LGPL3
+  licenses/MIT
   index.html
 
 Extra-source-files:
@@ -58,4 +64,4 @@ source-repository this
   type:     git
   branch:   master
   location: git://github.com/JustusAdam/elm-init.git
-  tag:      1.0.0.2
+  tag:      1.0.1.0
