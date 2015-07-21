@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE UnicodeSyntax     #-}
 
 module ElmInit.Interact
   ( askChoicesWithOther
@@ -6,24 +7,27 @@ module ElmInit.Interact
   ) where
 
 
-import           Control.Applicative ((<$>), (<*>))
-import qualified Control.Arrow       as Arrow (first)
-import           Data.Bool           (bool)
-import           Data.Text           (append)
-import           Data.Text           as Text (Text, intercalate, pack)
-import           Data.Text.IO        as TextIO (getLine, putStrLn)
-import           ElmInit.Util        (enumerate, getOr)
-import           Prelude             hiding (getLine, putStrLn)
+import           Control.Applicative         ((<$>), (<*>))
+import           Control.Applicative.Unicode
+import qualified Control.Arrow               as Arrow (first)
+import           Control.Monad.Unicode
+import           Data.Bool                   (bool)
+import           Data.Text                   (append)
+import           Data.Text                   as Text (Text, intercalate, pack)
+import           Data.Text.IO                as TextIO (getLine, putStrLn)
+import           ElmInit.Util                (enumerate, getOr)
+import           Prelude                     hiding (getLine, putStrLn)
+import           Prelude.Unicode
 
 
-askChoices :: Text -> Int -> [Text] -> IO Text
+askChoices ∷ Text → Int → [Text] → IO Text
 askChoices =
-  ((fmap <$> (!!) <*>) .) . askChoices'
+  ((fmap <$> (!!) ⊛) ∘) ∘ askChoices'
 
 
-askChoices' :: Text -> Int -> [Text] -> IO Int
+askChoices' ∷ Text → Int → [Text] → IO Int
 askChoices' message selected choices =
-  putStrLn message >>
+  putStrLn message ≫
   ask out
 
   where
@@ -32,40 +36,40 @@ askChoices' message selected choices =
       intercalate
         "\n"
         (normFormat 1 l1
-          ++ (selectedFormat selected selectedElem : normFormat (selected + 1) l2tail))
+          ⧺ (selectedFormat selected selectedElem : normFormat (selected + 1) l2tail))
 
-    enumF = flip append " )  " . pack . show
-    enumFn = append "    " . enumF
-    enumFs = append "  * " . enumF
-    normFormat = (map (uncurry append . Arrow.first enumFn) .) . enumerate
-    selectedFormat x y = (flip append y . enumFs) x
+    enumF = flip append " )  " ∘ pack ∘ show
+    enumFn = append "    " ∘ enumF
+    enumFs = append "  * " ∘ enumF
+    normFormat = (map (uncurry append ∘ Arrow.first enumFn) ∘) ∘ enumerate
+    selectedFormat x y = (flip append y ∘ enumFs) x
 
     ask a =
-      putStrLn a >>
-      getOr selected >>=
+      putStrLn a ≫
+      getOr selected ≫=
         (bool
-          (putStrLn "invalid choice, please choose again" >>
+          (putStrLn "invalid choice, please choose again" ≫
           ask a)
           <$> return
-          <*> (<= length choices))
+          ⊛ (≤ length choices))
 
 
-askChoicesWithOther :: Text -> Int -> (Text -> Either Text a) -> [Text] -> IO a
+askChoicesWithOther ∷ Text → Int → (Text → Either Text a) → [Text] → IO a
 askChoicesWithOther m s trans l =
-    askChoices' m s (l ++ ["other (specify)"])
-    >>= (flip bool getAlternative
-          <$> either (const $ error "No parse") return . trans . (l !!)
-          <*> (== length l))
+    askChoices' m s (l ⧺ ["other (specify)"])
+    ≫= (flip bool getAlternative
+          <$> either (const $ error "No parse") return ∘ trans ∘ (l !!)
+          ⊛ (≡ length l))
 
   where
     getAlternative =
-      putStrLn "please enter an alternative" >>
-      getLine >>=
+      putStrLn "please enter an alternative" ≫
+      getLine ≫=
         (either
-          (\message ->
-            putStrLn "Invalid input:" >>
-            putStrLn message >>
+          (\message →
+            putStrLn "Invalid input:" ≫
+            putStrLn message ≫
             getAlternative
           )
           return
-          . trans)
+          ∘ trans)
