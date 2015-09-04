@@ -14,6 +14,7 @@ maintainer:          dev@justus.science
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
+tested-with:         GHC >= 7.10.1
 
 Data-dir: resources
 
