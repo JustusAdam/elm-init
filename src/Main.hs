@@ -8,11 +8,11 @@ module Main (main) where
 import           Control.Applicative         ((<$>), (<*>))
 import           Control.Applicative.Unicode
 import           Control.Arrow               as Arrow (first)
-import           Control.Monad               (join)
+import           Control.Monad               (join, void, when)
 import           Control.Monad.Unicode
 import           Data.Aeson.Encode.Pretty    (encodePretty)
 import           Data.Bool                   (bool)
-import qualified Data.ByteString             as ByteString (ByteString, hPut)
+import qualified Data.ByteString             as ByteString (ByteString, hPut, writeFile)
 import qualified Data.ByteString.Char8       as CBS (pack, unpack)
 import qualified Data.ByteString.Lazy        as LBS (hPut)
 import           Data.Char                   (isUpper)
@@ -31,12 +31,14 @@ import           Prelude                     hiding (putStrLn)
 import           Prelude.Unicode
 import           System.Directory            (createDirectoryIfMissing,
                                               doesDirectoryExist, doesFileExist,
-                                              getCurrentDirectory, makeAbsolute)
+                                              getCurrentDirectory, makeAbsolute,
+                                              withCurrentDirectory)
 import           System.Environment          (getArgs)
 import           System.FilePath             (isValid, takeBaseName,
                                               takeExtension, (</>))
 import           System.IO                   (IOMode (WriteMode), withFile)
 import           Text.Printf                 (printf)
+import System.Process (callProcess)
 
 
 standardDirectories ∷ [FilePath]
@@ -56,6 +58,9 @@ mainFile = CBS.pack ∘ printf (CBS.unpack $(embedFile "resources/Main.elm"))
 
 indexHtml ∷ String → ByteString.ByteString
 indexHtml = CBS.pack ∘ printf (CBS.unpack $(embedFile "resources/index.html"))
+
+gitignore ∷ ByteString.ByteString
+gitignore = $(embedFile "resources/.gitignore")
 
 standardLicenses ∷ [(Text, Maybe ByteString.ByteString)]
 standardLicenses =
@@ -178,42 +183,51 @@ mkFile name defaultFile = exists name ≫=
     (return $ Left $ "file " ⊕ pack name ⊕ " already exists")
 
 
-mkSourceFiles ∷ FilePath → UserDecisions → IO [Result]
-mkSourceFiles wd (Default { mainFileName = mfn, sourceFolder = sourceF, addIndex = makeIndex }) = do
+mkSourceFiles ∷ UserDecisions → IO [Result]
+mkSourceFiles (Default { mainFileName = mfn, sourceFolder = sourceF, addIndex = makeIndex }) = do
   let mainModule = takeBaseName mfn
-  mainFileRes ← mkFile (wd  </> sourceF </> mfn) $ Just $ mainFile mainModule
+  mainFileRes ← mkFile (sourceF </> mfn) $ Just $ mainFile mainModule
   indexFileRes ← if makeIndex
-    then mkFile (wd </> "index.html") $ Just $ indexHtml mainModule
+    then mkFile "index.html" $ Just $ indexHtml mainModule
     else return $ return ()
-  others ← mkFiles $ flip map standardSourceFiles $ Arrow.first ((wd </> sourceF) </>)
+  others ← mkFiles standardSourceFiles
   return $ mainFileRes:indexFileRes:others
 
 
-mkDirs ∷ FilePath → [FilePath] → IO ()
-mkDirs = mapM_ ∘ (createDirectoryIfMissing True ∘) ∘ (</>)
+mkDirs ∷ [FilePath] → IO ()
+mkDirs = mapM_ (createDirectoryIfMissing True)
 
 
-writeConf ∷ FilePath → UserDecisions → IO ()
-writeConf wd =
+writeConf ∷ UserDecisions → IO ()
+writeConf =
   withFile
-    (wd </> elmConfigName)
+    elmConfigName
     WriteMode
     ∘ flip LBS.hPut ∘ encodePretty ∘ makePackage
 
 
-putLicense ∷ FilePath → Text → IO ()
-putLicense wd name =
+putLicense ∷ Text → IO ()
+putLicense name =
   case join $ lookup name standardLicenses of
     Nothing → return ()
     Just contents → do
       TextIO.putStrLn "The project owner(s): (for the license)"
       authors ← getLine
       (year, _, _) ← toGregorian ∘ utctDay <$> getCurrentTime
-      writeFile (wd </> "LICENSE") $
+      writeFile "LICENSE" $
         printf (CBS.unpack contents) year $
           if null authors
             then "[project owners]"
             else authors
+
+
+initGit ∷ IO ()
+initGit = do
+  TextIO.putStrLn "Shall I initialize a git repository? [Y/n]"
+  answ ← getLine
+  when (answ `elem` ["y", "Y", ""]) $ do
+    ByteString.writeFile ".gitignore" gitignore
+    void $ callProcess "git" ["init"]
 
 
 main ∷ IO ()
@@ -222,23 +236,27 @@ main = do
   -- get either the working directory or the directory the user entered
   wd        ← getCmdArgs ≫= (verifyWD ∘ workingDirectory)
 
-  -- ask all important input first
-  decisions ← getUserDecisions wd
+  withCurrentDirectory wd $ do
 
-  -- create necessary directories
-  mkDirs wd (sourceFolder decisions : standardDirectories)
+    -- ask all important input first
+    decisions ← getUserDecisions wd
 
-  -- create non-dynamic files, collect errors
-  resStatic ← mkFiles $ map (Arrow.first (wd </>)) standardFiles
+    -- create necessary directories
+    mkDirs (sourceFolder decisions : standardDirectories)
 
-  -- create Elm source files, collect errors
-  resSource ← mkSourceFiles wd decisions
+    -- create non-dynamic files, collect errors
+    resStatic ← mkFiles standardFiles
 
-  -- write the package config based on the user decisions
-  writeConf wd decisions
+    -- create Elm source files, collect errors
+    resSource ← mkSourceFiles decisions
 
-  -- write the choosen license
-  _         ← putLicense wd (license decisions)
+    -- write the package config based on the user decisions
+    writeConf decisions
 
-  -- report all errors
-  mapM_ (either TextIO.putStrLn return) (resStatic ⧺ resSource)
+    -- write the choosen license
+    _         ← putLicense (license decisions)
+
+    initGit
+
+    -- report all errors
+    mapM_ (either TextIO.putStrLn return) (resStatic ⧺ resSource)

@@ -44,7 +44,7 @@ executable elm-init
   build-depends:
       base >=4.6 && <5.0,
       filepath >= 1.4,
-      directory >= 1.2,
+      directory >= 1.2.3,
       file-embed >= 0.0.8,
       bytestring >= 0.10,
       aeson >= 0.8,
@@ -52,7 +52,8 @@ executable elm-init
       text >= 1.2,
       containers >= 0.5,
       time,
-      base-unicode-symbols
+      base-unicode-symbols,
+      process
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:
