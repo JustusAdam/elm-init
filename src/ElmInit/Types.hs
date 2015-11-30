@@ -7,6 +7,8 @@ module ElmInit.Types
   , UserDecisions(..)
   , ElmPackage(..)
   , readVersion
+  , makeVersion
+  , Version
   , makePackage
   , verifyElmVersion
   , readOneVersion
@@ -19,8 +21,9 @@ import           Control.Monad                ((<=<))
 import           Data.Aeson                   as Aeson (ToJSON, Value, object,
                                                         toJSON, (.=))
 import           Data.Text                    (Text, pack)
-import           Data.Version                 (Version (Version), makeVersion,
-                                               parseVersion, showVersion)
+import           Data.Traversable             (sequenceA)
+import           Data.Version                 (Version (Version), parseVersion,
+                                               showVersion)
 import           Prelude.Unicode
 import           Text.ParserCombinators.ReadP (readP_to_S)
 
@@ -56,6 +59,10 @@ data ElmPackage = ElmPackage { pkgVersion        ∷ Version
 
 readVersion ∷ String → [(Version, String)]
 readVersion = readP_to_S parseVersion
+
+
+makeVersion :: [Int] -> Version
+makeVersion = flip Version []
 
 
 instance Aeson.ToJSON ElmPackage where

@@ -11,11 +11,10 @@ import           Control.Applicative         ((<$>), (<*>))
 import           Control.Applicative.Unicode
 import qualified Control.Arrow               as Arrow (first)
 import           Control.Monad.Unicode
-import           Data.Bool                   (bool)
 import           Data.Text                   (append)
 import           Data.Text                   as Text (Text, intercalate, pack)
 import           Data.Text.IO                as TextIO (getLine, putStrLn)
-import           ElmInit.Util                (enumerate, getOr)
+import           ElmInit.Util                (enumerate, getOr, bool)
 import           Prelude                     hiding (getLine, putStrLn)
 import           Prelude.Unicode
 

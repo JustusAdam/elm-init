@@ -3,15 +3,20 @@ module ElmInit.Util
   ( exists
   , getOr
   , enumerate
+  , bool
   ) where
 
 
+import           Control.Applicative         ((<$>))
 import           Control.Applicative.Unicode
 import           Control.Exception           (IOException, catch)
-import           Control.Monad.Unicode
-import           Data.Bool                   (bool)
 import           Prelude.Unicode
 import           System.Directory            (doesDirectoryExist, doesFileExist)
+
+
+bool :: a -> a -> Bool -> a
+bool a _ False = a
+bool _ a True = a
 
 
 exists ∷ FilePath → IO Bool

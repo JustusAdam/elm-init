@@ -11,8 +11,8 @@ import           Control.Arrow               as Arrow (first)
 import           Control.Monad               (join, void, when)
 import           Control.Monad.Unicode
 import           Data.Aeson.Encode.Pretty    (encodePretty)
-import           Data.Bool                   (bool)
-import qualified Data.ByteString             as ByteString (ByteString, hPut, writeFile)
+import qualified Data.ByteString             as ByteString (ByteString, hPut,
+                                                            writeFile)
 import qualified Data.ByteString.Char8       as CBS (pack, unpack)
 import qualified Data.ByteString.Lazy        as LBS (hPut)
 import           Data.Char                   (isUpper)
@@ -21,12 +21,12 @@ import           Data.Monoid.Unicode
 import           Data.Text                   as Text (Text, pack, unpack)
 import qualified Data.Text.IO                as TextIO (getLine, putStrLn)
 import           Data.Time
-import           Data.Version                (Version (..), makeVersion,
-                                              showVersion)
+import           ElmInit.Types               (makeVersion, Version)
 import           ElmInit                     (CmdArgs (..), Result,
                                               UserDecisions (..), askChoices,
                                               askChoicesWithOther, exists,
                                               makePackage, verifyElmVersion)
+import           ElmInit.Util                (bool)
 import           Prelude                     hiding (putStrLn)
 import           Prelude.Unicode
 import           System.Directory            (createDirectoryIfMissing,
@@ -37,8 +37,8 @@ import           System.Environment          (getArgs)
 import           System.FilePath             (isValid, takeBaseName,
                                               takeExtension, (</>))
 import           System.IO                   (IOMode (WriteMode), withFile)
+import           System.Process              (callProcess)
 import           Text.Printf                 (printf)
-import System.Process (callProcess)
 
 
 standardDirectories ∷ [FilePath]
@@ -133,7 +133,7 @@ getUserDecisions wd = Default
         "initial project version?"
         0
         (verifyElmVersion ∘ unpack)
-        [pack $ showVersion defaultProjectVersion]
+        [pack $ show defaultProjectVersion]
   ⊛ (TextIO.putStrLn "a quick summary" ≫ TextIO.getLine)
   ⊛ (TextIO.putStrLn "project repository url" ≫ TextIO.getLine)
   ⊛ askChoicesWithOther

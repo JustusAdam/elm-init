@@ -14,7 +14,7 @@ maintainer:          dev@justus.science
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
-tested-with:         GHC >= 7.10.1
+tested-with:         GHC >= 7.6
 
 Data-dir: resources
 
@@ -28,6 +28,7 @@ Data-files:
   licenses/LGPL3
   licenses/MIT
   index.html
+  .gitignore
 
 Extra-source-files:
   README.md
