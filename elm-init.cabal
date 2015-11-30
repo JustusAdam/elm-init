@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                elm-init
-version:             1.0.1.0
+version:             1.0.1.1
 synopsis:            Set up basic structure for an elm project
 description:
   Initialize a new empty elm project with some basic scaffolding according to 'https://github.com/evancz/elm-architecture-tutorial'.
