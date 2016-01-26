@@ -10,6 +10,7 @@ module ElmInit.Types
   , makeVersion
   , Version
   , makePackage
+  , showVersion
   , verifyElmVersion
   , readOneVersion
   ) where
@@ -20,10 +21,11 @@ import           Control.Applicative.Unicode
 import           Control.Monad                ((<=<))
 import           Data.Aeson                   as Aeson (ToJSON, Value, object,
                                                         toJSON, (.=))
+import           Data.List                    (intercalate)
 import           Data.Text                    (Text, pack)
 import           Data.Traversable             (sequenceA)
 import           Data.Version                 (Version (Version), parseVersion,
-                                               showVersion)
+                                               versionBranch)
 import           Prelude.Unicode
 import           Text.ParserCombinators.ReadP (readP_to_S)
 
@@ -55,6 +57,9 @@ data ElmPackage = ElmPackage { pkgVersion        ∷ Version
                              , pkgElmVersion     ∷ Text
                              , pkgSourceDirs     ∷ [Text]
                              }
+
+showVersion :: Version -> String
+showVersion = intercalate "." . map show . versionBranch
 
 
 readVersion ∷ String → [(Version, String)]

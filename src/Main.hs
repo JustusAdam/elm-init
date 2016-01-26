@@ -8,7 +8,7 @@ module Main (main) where
 import           Control.Applicative         ((<$>), (<*>))
 import           Control.Applicative.Unicode
 import           Control.Arrow               as Arrow (first)
-import           Control.Monad               (join, void, when)
+import           Control.Monad               (join, void, when, unless)
 import           Control.Monad.Unicode
 import           Data.Aeson.Encode.Pretty    (encodePretty)
 import qualified Data.ByteString             as ByteString (ByteString, hPut,
@@ -21,7 +21,7 @@ import           Data.Monoid.Unicode
 import           Data.Text                   as Text (Text, pack, unpack)
 import qualified Data.Text.IO                as TextIO (getLine, putStrLn)
 import           Data.Time
-import           ElmInit.Types               (makeVersion, Version)
+import           ElmInit.Types               (makeVersion, Version, showVersion)
 import           ElmInit                     (CmdArgs (..), Result,
                                               UserDecisions (..), askChoices,
                                               askChoicesWithOther, exists,
@@ -133,7 +133,7 @@ getUserDecisions wd = Default
         "initial project version?"
         0
         (verifyElmVersion ∘ unpack)
-        [pack $ show defaultProjectVersion]
+        [pack $ showVersion defaultProjectVersion]
   ⊛ (TextIO.putStrLn "a quick summary" ≫ TextIO.getLine)
   ⊛ (TextIO.putStrLn "project repository url" ≫ TextIO.getLine)
   ⊛ askChoicesWithOther
@@ -223,11 +223,13 @@ putLicense name =
 
 initGit ∷ IO ()
 initGit = do
-  TextIO.putStrLn "Shall I initialize a git repository? [Y/n]"
-  answ ← getLine
-  when (answ `elem` ["y", "Y", ""]) $ do
-    ByteString.writeFile ".gitignore" gitignore
-    void $ callProcess "git" ["init"]
+  hasGit <- doesDirectoryExist ".git"
+  unless hasGit $ do
+    TextIO.putStrLn "Shall I initialize a git repository? [Y/n]"
+    answ ← getLine
+    when (answ `elem` ["y", "Y", ""]) $ do
+      ByteString.writeFile ".gitignore" gitignore
+      void $ callProcess "git" ["init"]
 
 
 main ∷ IO ()
