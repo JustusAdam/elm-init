@@ -35,7 +35,7 @@ import           System.Directory            (createDirectoryIfMissing,
                                               withCurrentDirectory)
 import           System.Environment          (getArgs)
 import           System.FilePath             (isValid, takeBaseName,
-                                              takeExtension, (</>))
+                                              takeExtension, (</>), takeDirectory)
 import           System.IO                   (IOMode (WriteMode), withFile)
 import           System.Process              (callProcess)
 import           Text.Printf                 (printf)
@@ -118,44 +118,48 @@ verifyWD wd =
 
 
 getUserDecisions ∷ FilePath → IO UserDecisions
-getUserDecisions wd = Default
-  <$> askChoicesWithOther
-        "project name?"
-        0
-        return
-        [pack $ takeBaseName wd]
-  ⊛ askChoicesWithOther
-        "choose a source folder name"
-        0
-        ((bool (Left "The filepath must be valid") <$> return ⊛ isValid) ∘ unpack)  -- filepath path verifier
-        (map pack standardSourceFolders)
-  ⊛ askChoicesWithOther
-        "initial project version?"
-        0
-        (verifyElmVersion ∘ unpack)
-        [pack $ showVersion defaultProjectVersion]
-  ⊛ (TextIO.putStrLn "a quick summary" ≫ TextIO.getLine)
-  ⊛ (TextIO.putStrLn "project repository url" ≫ TextIO.getLine)
-  ⊛ askChoicesWithOther
-        "choose a license"
-        0
-        return
-        availableLicenses
-  ⊛ askChoicesWithOther
-        "select the elm-version"
-        0
-        return
-        [defaultElmVersion]
-  ⊛ askChoicesWithOther
-        "What sould be the Main file?"
-        0
-        (isValidMainFile . unpack)
-        ["Main.elm"]
-  ⊛ ((≡ "Yes") <$> askChoices
-        "Should I create an index.html file?"
-        0
-        ["Yes", "No"]
-      )
+getUserDecisions wd = do
+  dir <- makeAbsolute wd
+  let basename = takeBaseName dir
+      dirname = if null basename then takeBaseName $ takeDirectory dir else basename
+  Default
+    <$> askChoicesWithOther
+          "project name?"
+          0
+          return
+          [pack dirname]
+    ⊛ askChoicesWithOther
+          "choose a source folder name"
+          0
+          ((bool (Left "The filepath must be valid") <$> return ⊛ isValid) ∘ unpack)  -- filepath path verifier
+          (map pack standardSourceFolders)
+    ⊛ askChoicesWithOther
+          "initial project version?"
+          0
+          (verifyElmVersion ∘ unpack)
+          [pack $ showVersion defaultProjectVersion]
+    ⊛ (TextIO.putStrLn "a quick summary" ≫ TextIO.getLine)
+    ⊛ (TextIO.putStrLn "project repository url" ≫ TextIO.getLine)
+    ⊛ askChoicesWithOther
+          "choose a license"
+          0
+          return
+          availableLicenses
+    ⊛ askChoicesWithOther
+          "select the elm-version"
+          0
+          return
+          [defaultElmVersion]
+    ⊛ askChoicesWithOther
+          "What sould be the Main file?"
+          0
+          (isValidMainFile . unpack)
+          ["Main.elm"]
+    ⊛ ((≡ "Yes") <$> askChoices
+          "Should I create an index.html file?"
+          0
+          ["Yes", "No"]
+        )
 
 
 isValidMainFile ∷ String → Either Text String
