@@ -87,7 +87,7 @@ emptyDecisions ∷ UserDecisions
 emptyDecisions =
   Default { summary       = ""
           , repository    = ""
-          , version       = makeVersion [0, 0, 0]
+          , version       = makeVersion [1, 0, 0]
           , license       = ""
           , sourceFolder  = ""
           , projectName   = ""
