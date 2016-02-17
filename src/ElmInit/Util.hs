@@ -4,14 +4,17 @@ module ElmInit.Util
   , getOr
   , enumerate
   , bool
+  , withCurrentDirectory
   ) where
 
 
 import           Control.Applicative         ((<$>))
 import           Control.Applicative.Unicode
-import           Control.Exception           (IOException, catch)
+import           Control.Exception           (IOException, catch, bracket)
 import           Prelude.Unicode
-import           System.Directory            (doesDirectoryExist, doesFileExist)
+import           System.Directory            (doesDirectoryExist, doesFileExist,
+                                              getCurrentDirectory,
+                                              setCurrentDirectory)
 
 
 bool :: a -> a -> Bool -> a
@@ -38,3 +41,11 @@ getOr =
 
 enumerate ∷ Int → [a] → [(Int,a)]
 enumerate from l = zip [from..(length l)] l
+
+
+-- Taken from the directory package
+withCurrentDirectory :: FilePath -> IO a -> IO a
+withCurrentDirectory dir action =
+  bracket getCurrentDirectory setCurrentDirectory $ \ _ -> do
+    setCurrentDirectory dir
+    action

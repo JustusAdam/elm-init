@@ -26,13 +26,12 @@ import           ElmInit                     (CmdArgs (..), Result,
                                               UserDecisions (..), askChoices,
                                               askChoicesWithOther, exists,
                                               makePackage, verifyElmVersion)
-import           ElmInit.Util                (bool)
+import           ElmInit.Util                (bool, withCurrentDirectory)
 import           Prelude                     hiding (putStrLn)
 import           Prelude.Unicode
 import           System.Directory            (createDirectoryIfMissing,
                                               doesDirectoryExist, doesFileExist,
-                                              getCurrentDirectory, makeAbsolute,
-                                              withCurrentDirectory)
+                                              getCurrentDirectory, makeAbsolute)
 import           System.Environment          (getArgs)
 import           System.FilePath             (isValid, takeBaseName,
                                               takeExtension, (</>), takeDirectory)
