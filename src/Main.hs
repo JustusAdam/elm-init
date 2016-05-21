@@ -77,7 +77,7 @@ defaultProjectVersion ∷ Version
 defaultProjectVersion = makeVersion [1, 0, 0]
 
 defaultElmVersion ∷ Text
-defaultElmVersion = "0.15.0 <= v < 0.16.0"
+defaultElmVersion = "0.17.0 <= v < 0.18.0"
 
 availableLicenses ∷ [Text]
 availableLicenses = fst $ unzip standardLicenses
