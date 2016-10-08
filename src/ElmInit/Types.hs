@@ -103,7 +103,9 @@ makePackage = ElmPackage
   ⊛ summary
   ⊛ repository
   ⊛ license
-  ⊛ const (object [("elm-lang/core", "3.0.0 <= v < 4.0.0")])
+  ⊛ const (object [ ("elm-lang/core", "4.0.5 <= v < 5.0.0")
+                  , ("elm-lang/html", "1.1.0 <= v < 2.0.0")
+                  ])
   ⊛ const []
   ⊛ elmVersion
   ⊛ (:[]) . pack . sourceFolder
